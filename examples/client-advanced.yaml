@@ -1,0 +1,192 @@
+apiVersion: openidclient.keycloak.m.crossplane.io/v1beta1
+kind: Client
+metadata:
+  name: advanced-oauth2-client
+  namespace: crossplane-keycloak
+spec:
+  forProvider:
+    realmId: my-realm
+    clientId: advanced-app
+    accessType: CONFIDENTIAL
+    name: "Advanced OAuth2 Application"
+    enabled: true
+
+    # Standard OAuth2 flows
+    standardFlowEnabled: true
+    implicitFlowEnabled: false
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: true
+
+    # Advanced client flags
+    publicClient: false
+    bearerOnly: false
+    consentRequired: false
+    fullScopeAllowed: true
+    alwaysDisplayInConsole: true
+
+    # PKCE and token configuration
+    protocol: openid-connect
+    pkceCodeChallengeMethod: S256
+    useRefreshTokens: true
+    accessTokenLifespan: "600"  # 10 minutes in seconds
+
+    # Session configuration
+    clientSessionIdleTimeout: "300"
+    clientSessionMaxLifespan: "36000"
+    clientOfflineSessionIdleTimeout: "2592000"
+    clientOfflineSessionMaxLifespan: "5184000"
+
+    # Authorization services
+    authorizationServicesEnabled: true
+    oauth2DeviceAuthorizationGrantEnabled: false
+    standardTokenExchangeEnabled: true
+
+    # URLs
+    rootUrl: "https://app.example.com"
+    homeUrl: "https://app.example.com/home"
+    baseUrl: "https://app.example.com/"
+    adminUrl: "https://app.example.com/admin"
+
+    # Redirect configuration
+    validRedirectUris:
+      - "https://app.example.com/*"
+      - "https://app.example.com:8080/*"
+    webOrigins:
+      - "+"
+
+    # Logout configuration
+    frontchannelLogoutEnabled: true
+    frontchannelLogoutUrl: "https://app.example.com/logout"
+    backchannelLogoutUrl: "https://app.example.com/logout/backchannel"
+    backchannelLogoutSessionRequired: true
+    backchannelLogoutRevokeOfflineSessions: true
+
+    # Client secret management
+    clientSecretSecretRef:
+      name: advanced-app-client-secret
+      namespace: crossplane-keycloak
+      key: client-secret
+
+    # Additional configuration
+    description: "Advanced OAuth2 client with comprehensive security settings"
+    loginTheme: "custom-theme"
+
+  providerConfigRef:
+    name: keycloak-config
+
+---
+apiVersion: openidclient.keycloak.m.crossplane.io/v1beta1
+kind: Client
+metadata:
+  name: public-spa-client
+  namespace: crossplane-keycloak
+spec:
+  forProvider:
+    realmId: my-realm
+    clientId: spa-app
+    accessType: PUBLIC
+    name: "Single Page Application"
+    enabled: true
+
+    # Public client configuration
+    publicClient: true
+    bearerOnly: false
+    standardFlowEnabled: true
+    implicitFlowEnabled: true
+
+    # PKCE enforcement for public clients
+    protocol: openid-connect
+    pkceCodeChallengeMethod: S256
+
+    # URLs for SPA
+    rootUrl: "https://spa.example.com"
+    homeUrl: "https://spa.example.com/"
+    baseUrl: "https://spa.example.com/"
+
+    # SPA redirect URIs
+    validRedirectUris:
+      - "https://spa.example.com/*"
+      - "http://localhost:3000/*"
+    validPostLogoutRedirectUris:
+      - "https://spa.example.com/"
+      - "http://localhost:3000/"
+    webOrigins:
+      - "https://spa.example.com"
+      - "http://localhost:3000"
+
+    # Logout configuration
+    frontchannelLogoutEnabled: true
+    frontchannelLogoutUrl: "https://spa.example.com/logout"
+
+    # Token settings
+    accessTokenLifespan: "300"
+    useRefreshTokens: true
+
+  providerConfigRef:
+    name: keycloak-config
+
+---
+apiVersion: openidclient.keycloak.m.crossplane.io/v1beta1
+kind: Client
+metadata:
+  name: service-account-client
+  namespace: crossplane-keycloak
+spec:
+  forProvider:
+    realmId: my-realm
+    clientId: backend-service
+    accessType: CONFIDENTIAL
+    name: "Backend Service Account"
+    enabled: true
+
+    # Service account configuration
+    serviceAccountsEnabled: true
+    standardFlowEnabled: false
+    publicClient: false
+
+    # Protocol and security
+    protocol: openid-connect
+    useRefreshTokens: true
+    accessTokenLifespan: "3600"
+
+    # Session configuration for service accounts
+    clientSessionIdleTimeout: "3600"
+    clientSessionMaxLifespan: "86400"
+
+    # Client secret management
+    clientSecretSecretRef:
+      name: backend-service-secret
+      namespace: crossplane-keycloak
+      key: client-secret
+
+    description: "Service account for backend-to-backend authentication"
+
+  providerConfigRef:
+    name: keycloak-config
+
+---
+apiVersion: openidclient.keycloak.m.crossplane.io/v1beta1
+kind: Client
+metadata:
+  name: legacy-bearer-client
+  namespace: crossplane-keycloak
+spec:
+  forProvider:
+    realmId: my-realm
+    clientId: legacy-api
+    accessType: BEARER_ONLY
+    name: "Legacy Bearer-Only API"
+    enabled: true
+
+    # Bearer-only configuration
+    bearerOnly: true
+    publicClient: false
+
+    # Protocol configuration
+    protocol: openid-connect
+
+    # No redirect URIs needed for bearer-only clients
+    # API will validate tokens without redirects
+
+  providerConfigRef:
+    name: keycloak-config

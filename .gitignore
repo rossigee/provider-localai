@@ -1,0 +1,45 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.out
+coverage.txt
+
+# Dependency directories
+vendor/
+vendor-new/
+.vendor/
+
+# Go workspace file
+go.work
+
+# Build outputs
+_output/
+bin/
+dist/
+*.xpkg
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Development
+.work/
+kubeconfig
+.DS_Store
+
+# Debug
+__debug*
+# Cache directories
+.cache/

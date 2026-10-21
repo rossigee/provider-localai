@@ -1,0 +1,444 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: realms.realm.keycloak.m.crossplane.io
+spec:
+  group: realm.keycloak.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - keycloak
+    kind: Realm
+    listKind: RealmList
+    plural: realms
+    singular: realm
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.forProvider.realm
+      name: REALM
+      type: string
+    - jsonPath: .spec.forProvider.enabled
+      name: ENABLED
+      type: boolean
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: A Realm is a Keycloak realm.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RealmSpec defines the desired state of a Realm.
+            properties:
+              forProvider:
+                description: RealmParameters are the configurable fields of a Realm.
+                properties:
+                  accessCodeLifespan:
+                    description: AccessCodeLifespan is the lifespan of authorization
+                      codes.
+                    type: string
+                  accessCodeLifespanLogin:
+                    description: AccessCodeLifespanLogin is the lifespan of login
+                      action codes.
+                    type: string
+                  accessCodeLifespanUserAction:
+                    description: AccessCodeLifespanUserAction is the lifespan of user
+                      action codes.
+                    type: string
+                  accessTokenLifespan:
+                    description: AccessTokenLifespan is the lifespan of access tokens
+                      (e.g. "30m0s").
+                    type: string
+                  accessTokenLifespanForImplicitFlow:
+                    description: AccessTokenLifespanForImplicitFlow is the lifespan
+                      for implicit flow tokens.
+                    type: string
+                  accountTheme:
+                    description: AccountTheme sets the account console theme.
+                    type: string
+                  actionTokenGeneratedByAdminLifespan:
+                    description: ActionTokenGeneratedByAdminLifespan is the lifespan
+                      of admin-generated action tokens.
+                    type: string
+                  actionTokenGeneratedByUserLifespan:
+                    description: ActionTokenGeneratedByUserLifespan is the lifespan
+                      of user-generated action tokens.
+                    type: string
+                  adminPermissionsEnabled:
+                    description: AdminPermissionsEnabled enables fine-grained admin
+                      permissions.
+                    type: boolean
+                  adminTheme:
+                    description: AdminTheme sets the admin console theme.
+                    type: string
+                  attributes:
+                    additionalProperties:
+                      type: string
+                    description: Attributes is a map of realm attributes.
+                    type: object
+                  browserFlow:
+                    description: BrowserFlow overrides the browser authentication
+                      flow.
+                    type: string
+                  clientAuthenticationFlow:
+                    description: ClientAuthenticationFlow overrides the client authentication
+                      flow.
+                    type: string
+                  clientSessionIdleTimeout:
+                    description: ClientSessionIdleTimeout is the client session idle
+                      timeout.
+                    type: string
+                  clientSessionMaxLifespan:
+                    description: ClientSessionMaxLifespan is the client session maximum
+                      lifespan.
+                    type: string
+                  defaultDefaultClientScopes:
+                    description: DefaultDefaultClientScopes is the list of default
+                      client scopes.
+                    items:
+                      type: string
+                    type: array
+                  defaultOptionalClientScopes:
+                    description: DefaultOptionalClientScopes is the list of optional
+                      client scopes.
+                    items:
+                      type: string
+                    type: array
+                  defaultSignatureAlgorithm:
+                    description: DefaultSignatureAlgorithm is the default algorithm
+                      for signing tokens.
+                    type: string
+                  directGrantFlow:
+                    description: DirectGrantFlow overrides the direct grant flow.
+                    type: string
+                  displayName:
+                    description: DisplayName is the display name of the realm.
+                    type: string
+                  displayNameHtml:
+                    description: DisplayNameHtml is the HTML display name.
+                    type: string
+                  duplicateEmailsAllowed:
+                    description: DuplicateEmailsAllowed allows multiple accounts with
+                      the same email.
+                    type: boolean
+                  editUsernameAllowed:
+                    description: EditUsernameAllowed allows users to edit their username.
+                    type: boolean
+                  emailTheme:
+                    description: EmailTheme sets the email theme.
+                    type: string
+                  enabled:
+                    description: Enabled indicates if the realm is enabled.
+                    type: boolean
+                  frontendUrl:
+                    description: |-
+                      FrontendURL is the public URL for the realm's login pages.
+                      This affects OIDC issuer URLs and redirect URIs for vanity domains.
+                    type: string
+                  loginTheme:
+                    description: LoginTheme sets the login page theme.
+                    type: string
+                  loginWithEmailAllowed:
+                    description: LoginWithEmailAllowed allows login with email address.
+                    type: boolean
+                  offlineSessionIdleTimeout:
+                    description: OfflineSessionIdleTimeout is the offline session
+                      idle timeout.
+                    type: string
+                  offlineSessionMaxLifespan:
+                    description: OfflineSessionMaxLifespan is the offline session
+                      maximum lifespan.
+                    type: string
+                  offlineSessionMaxLifespanEnabled:
+                    description: OfflineSessionMaxLifespanEnabled enables the offline
+                      session maximum lifespan.
+                    type: boolean
+                  passwordPolicy:
+                    description: PasswordPolicy is the password policy string.
+                    type: string
+                  realm:
+                    description: Realm is the realm name (ID).
+                    type: string
+                  refreshTokenMaxReuse:
+                    description: RefreshTokenMaxReuse sets the maximum number of times
+                      a refresh token may be reused.
+                    format: int64
+                    type: integer
+                  registrationAllowed:
+                    description: RegistrationAllowed allows user self-registration.
+                    type: boolean
+                  registrationEmailAsUsername:
+                    description: RegistrationEmailAsUsername uses email as username
+                      during registration.
+                    type: boolean
+                  registrationFlow:
+                    description: RegistrationFlow overrides the registration flow.
+                    type: string
+                  rememberMe:
+                    description: RememberMe enables the remember-me feature.
+                    type: boolean
+                  resetCredentialsFlow:
+                    description: ResetCredentialsFlow overrides the reset credentials
+                      flow.
+                    type: string
+                  resetPasswordAllowed:
+                    description: ResetPasswordAllowed allows users to reset their
+                      password.
+                    type: boolean
+                  revokeRefreshToken:
+                    description: RevokeRefreshToken revokes refresh tokens after use.
+                    type: boolean
+                  smtpServer:
+                    description: SmtpServer configures the SMTP server for outgoing
+                      emails.
+                    items:
+                      description: SmtpServer defines the SMTP server configuration
+                        for a realm.
+                      properties:
+                        auth:
+                          description: Auth holds authentication credentials.
+                          items:
+                            description: SmtpServerAuth holds SMTP authentication
+                              credentials.
+                            properties:
+                              passwordSecretRef:
+                                description: PasswordSecretRef references the secret
+                                  containing the SMTP password.
+                                properties:
+                                  key:
+                                    description: Key within the secret.
+                                    type: string
+                                  name:
+                                    description: Name of the secret.
+                                    type: string
+                                  namespace:
+                                    description: Namespace of the secret.
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                - namespace
+                                type: object
+                              username:
+                                description: Username for SMTP authentication.
+                                type: string
+                            type: object
+                          type: array
+                        envelopeFrom:
+                          description: EnvelopeFrom is the envelope from address.
+                          type: string
+                        from:
+                          description: From is the sender email address.
+                          type: string
+                        fromDisplayName:
+                          description: FromDisplayName is the display name for the
+                            sender.
+                          type: string
+                        host:
+                          description: Host is the SMTP server hostname.
+                          type: string
+                        port:
+                          description: Port is the SMTP server port.
+                          type: string
+                        replyTo:
+                          description: ReplyTo is the reply-to email address.
+                          type: string
+                        replyToDisplayName:
+                          description: ReplyToDisplayName is the display name for
+                            the reply-to address.
+                          type: string
+                        ssl:
+                          description: Ssl enables SSL.
+                          type: boolean
+                        starttls:
+                          description: Starttls enables STARTTLS.
+                          type: boolean
+                      type: object
+                    type: array
+                  sslRequired:
+                    description: SslRequired sets the SSL requirement (none, external,
+                      all).
+                    enum:
+                    - none
+                    - external
+                    - all
+                    type: string
+                  ssoSessionIdleTimeout:
+                    description: SsoSessionIdleTimeout is the SSO session idle timeout.
+                    type: string
+                  ssoSessionIdleTimeoutRememberMe:
+                    description: SsoSessionIdleTimeoutRememberMe is the idle timeout
+                      for remember-me sessions.
+                    type: string
+                  ssoSessionMaxLifespan:
+                    description: SsoSessionMaxLifespan is the SSO session maximum
+                      lifespan.
+                    type: string
+                  ssoSessionMaxLifespanRememberMe:
+                    description: SsoSessionMaxLifespanRememberMe is the maximum lifespan
+                      for remember-me sessions.
+                    type: string
+                  userManagedAccess:
+                    description: UserManagedAccess enables user-managed access.
+                    type: boolean
+                  verifyEmail:
+                    description: VerifyEmail requires email verification after registration.
+                    type: boolean
+                required:
+                - realm
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: RealmStatus defines the observed state of a Realm.
+            properties:
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              lastHandledReconcileAt:
+                description: |-
+                  LastHandledReconcileAt holds the value of the most recent
+                  reconcile-requested-at annotation token that the controller has
+                  processed. Users can compare this to the annotation to determine
+                  whether a reconcile request has been handled.
+                type: string
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

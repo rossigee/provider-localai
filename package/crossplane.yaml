@@ -1,0 +1,40 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-keycloak
+  annotations:
+    meta.crossplane.io/maintainer: Ross Golder <ross@golder.org>
+    meta.crossplane.io/source: github.com/rossigee/provider-keycloak
+    meta.crossplane.io/license: Apache-2.0
+    meta.crossplane.io/description: |
+      Crossplane provider for Keycloak
+spec:
+  permissionRequests:
+  # Core API group events (legacy API)
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+  # Structured events API (K8s 1.19+)
+  - apiGroups:
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+  # Leases for controller leader election
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - "*"
+  controller: {}
+  crossplane:
+    version: ">=v2.5.0"

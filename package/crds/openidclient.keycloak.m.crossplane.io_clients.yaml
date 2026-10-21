@@ -1,0 +1,490 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: clients.openidclient.keycloak.m.crossplane.io
+spec:
+  group: openidclient.keycloak.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - keycloak
+    kind: Client
+    listKind: ClientList
+    plural: clients
+    singular: client
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.forProvider.realmId
+      name: REALM
+      type: string
+    - jsonPath: .spec.forProvider.clientId
+      name: CLIENT-ID
+      type: string
+    - jsonPath: .spec.forProvider.accessType
+      name: ACCESS-TYPE
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: A Client is an OpenID Connect client managed by Keycloak.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClientSpec defines the desired state of a Client.
+            properties:
+              forProvider:
+                description: ClientParameters are the configurable fields of a Client.
+                properties:
+                  accessType:
+                    description: AccessType specifies the client access type (CONFIDENTIAL,
+                      PUBLIC, BEARER_ONLY).
+                    enum:
+                    - CONFIDENTIAL
+                    - PUBLIC
+                    - BEARER_ONLY
+                    type: string
+                  adminUrl:
+                    description: AdminUrl is the URL to the admin interface of the
+                      client.
+                    type: string
+                  alwaysDisplayInConsole:
+                    description: AlwaysDisplayInConsole always displays this client
+                      in the account console.
+                    type: boolean
+                  authorizationServicesEnabled:
+                    description: AuthorizationServicesEnabled enables authorization
+                      services for this client.
+                    type: boolean
+                  backchannelLogoutRevokeOfflineSessions:
+                    description: BackchannelLogoutRevokeOfflineSessions revokes offline
+                      sessions on back-channel logout.
+                    type: boolean
+                  backchannelLogoutSessionRequired:
+                    description: BackchannelLogoutSessionRequired specifies whether
+                      a session is required on back-channel logout.
+                    type: boolean
+                  backchannelLogoutUrl:
+                    description: BackchannelLogoutUrl is the URL for back-channel
+                      logout.
+                    type: string
+                  baseUrl:
+                    description: BaseUrl is the default URL for redirecting when no
+                      redirect URI is specified.
+                    type: string
+                  bearerOnly:
+                    description: BearerOnly indicates if the client is bearer-only.
+                    type: boolean
+                  clientId:
+                    description: ClientId is the OAuth2 client identifier.
+                    type: string
+                  clientOfflineSessionIdleTimeout:
+                    description: ClientOfflineSessionIdleTimeout is the idle timeout
+                      for offline client sessions.
+                    type: string
+                  clientOfflineSessionMaxLifespan:
+                    description: ClientOfflineSessionMaxLifespan is the max lifespan
+                      for offline client sessions.
+                    type: string
+                  clientSecretSecretRef:
+                    description: |-
+                      ClientSecretSecretRef references the Kubernetes secret that will receive the generated client secret.
+                      Deprecated: Use ReadFromSecretRef instead. This field behaves the same way.
+                    properties:
+                      key:
+                        description: Key within the secret.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  clientSessionIdleTimeout:
+                    description: ClientSessionIdleTimeout is the idle timeout for
+                      client sessions.
+                    type: string
+                  clientSessionMaxLifespan:
+                    description: ClientSessionMaxLifespan is the max lifespan for
+                      client sessions.
+                    type: string
+                  consentRequired:
+                    description: ConsentRequired requires user consent before the
+                      client receives tokens.
+                    type: boolean
+                  description:
+                    description: Description is the client description.
+                    type: string
+                  directAccessGrantsEnabled:
+                    description: DirectAccessGrantsEnabled enables the resource owner
+                      password credentials grant.
+                    type: boolean
+                  enabled:
+                    description: Enabled indicates if the client is enabled.
+                    type: boolean
+                  extraConfig:
+                    additionalProperties:
+                      type: string
+                    description: ExtraConfig is a map of additional Keycloak client
+                      configuration.
+                    type: object
+                  frontchannelLogoutEnabled:
+                    description: FrontchannelLogoutEnabled enables front-channel logout.
+                    type: boolean
+                  frontchannelLogoutUrl:
+                    description: FrontchannelLogoutUrl is the URL for front-channel
+                      logout.
+                    type: string
+                  fullScopeAllowed:
+                    description: FullScopeAllowed allows all roles to be mapped as
+                      scope.
+                    type: boolean
+                  homeUrl:
+                    description: HomeUrl is the client home URL for linking from the
+                      account console.
+                    type: string
+                  implicitFlowEnabled:
+                    description: ImplicitFlowEnabled enables the implicit flow.
+                    type: boolean
+                  loginTheme:
+                    description: LoginTheme overrides the login theme for this client.
+                    type: string
+                  name:
+                    description: Name is the display name of the client.
+                    type: string
+                  oauth2DeviceAuthorizationGrantEnabled:
+                    description: OAuth2DeviceAuthorizationGrantEnabled enables the
+                      OAuth2 Device Authorization Grant flow.
+                    type: boolean
+                  pkceCodeChallengeMethod:
+                    description: PkceCodeChallengeMethod specifies the PKCE code challenge
+                      method.
+                    type: string
+                  protocol:
+                    description: Protocol is the protocol used by the client (openid-connect
+                      or saml).
+                    type: string
+                  publicClient:
+                    description: PublicClient indicates if the client is public (no
+                      client secret).
+                    type: boolean
+                  readFromSecretRef:
+                    description: |-
+                      ReadFromSecretRef references a Kubernetes secret that will receive the
+                      client secret generated by Keycloak. The secret will be populated after
+                      client creation. Use this to sync the generated secret to external systems.
+                      Cannot be used together with WriteToSecretRef.
+                    properties:
+                      key:
+                        description: Key within the secret.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  realmId:
+                    description: RealmId is the ID of the realm this client belongs
+                      to.
+                    type: string
+                  realmIdRef:
+                    description: RealmIdRef is a reference to a Realm to populate
+                      realmId.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  realmIdSelector:
+                    description: RealmIdSelector selects a reference to a Realm.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  rootUrl:
+                    description: RootUrl is the client root URL appended to relative
+                      URLs.
+                    type: string
+                  serviceAccountsEnabled:
+                    description: ServiceAccountsEnabled enables service accounts (client
+                      credentials grant).
+                    type: boolean
+                  standardFlowEnabled:
+                    description: StandardFlowEnabled enables the standard OpenID Connect
+                      redirect based flow.
+                    type: boolean
+                  standardTokenExchangeEnabled:
+                    description: StandardTokenExchangeEnabled enables Standard Token
+                      Exchange.
+                    type: boolean
+                  useRefreshTokens:
+                    description: UseRefreshTokens enables refresh tokens for this
+                      client.
+                    type: boolean
+                  validPostLogoutRedirectUris:
+                    description: ValidPostLogoutRedirectUris is the list of valid
+                      post-logout redirect URIs.
+                    items:
+                      type: string
+                    type: array
+                  validRedirectUris:
+                    description: ValidRedirectUris is the list of valid redirect URIs.
+                    items:
+                      type: string
+                    type: array
+                  webOrigins:
+                    description: WebOrigins is the list of allowed CORS origins.
+                    items:
+                      type: string
+                    type: array
+                  writeToSecretRef:
+                    description: |-
+                      WriteToSecretRef references a Kubernetes secret containing the client secret
+                      to be pushed to Keycloak. If set, the value from this secret will be used
+                      as the client secret instead of letting Keycloak generate one.
+                      Cannot be used together with ReadFromSecretRef.
+                    properties:
+                      key:
+                        description: Key within the secret.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                required:
+                - clientId
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: ClientStatus defines the observed state of a Client.
+            properties:
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              lastHandledReconcileAt:
+                description: |-
+                  LastHandledReconcileAt holds the value of the most recent
+                  reconcile-requested-at annotation token that the controller has
+                  processed. Users can compare this to the annotation to determine
+                  whether a reconcile request has been handled.
+                type: string
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
