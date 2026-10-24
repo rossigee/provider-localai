@@ -19,11 +19,19 @@ const controllerName = "providerconfig.localai.crossplane.io"
 
 // Setup registers the ProviderConfig controller.
 func Setup(mgr ctrl.Manager) error {
-	r := &reconciler{kube: mgr.GetClient(), logger: mgr.GetLogger()}
-	return ctrl.NewControllerManagedBy(mgr).
+	logger := mgr.GetLogger().WithValues("controller", controllerName)
+	logger.Info("Setting up ProviderConfig controller")
+	r := &reconciler{kube: mgr.GetClient(), logger: logger}
+	c, err := ctrl.NewControllerManagedBy(mgr).
 		Named(controllerName).
 		For(&v1beta1.ProviderConfig{}).
-		Complete(r)
+		Build(r)
+	if err != nil {
+		logger.Error(err, "Failed to build controller")
+		return err
+	}
+	logger.Info("Controller built, starting", "controller", c)
+	return nil
 }
 
 type reconciler struct {
