@@ -13,7 +13,7 @@ import (
 
 // Setup sets up LocalAI provider controllers.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	mgr.GetLogger().Info("Setting up all LocalAI provider controllers")
+	mgr.GetLogger().WithValues("stage", "setup").Info(">>> Setting up all LocalAI provider controllers <<<")
 	if err := providerconfig.Setup(mgr); err != nil {
 		return err
 	}
