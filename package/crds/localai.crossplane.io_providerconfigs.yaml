@@ -4,28 +4,19 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.21.0
-  name: providerconfigs.keycloak.m.crossplane.io
+  name: providerconfigs.localai.crossplane.io
 spec:
-  group: keycloak.m.crossplane.io
+  group: localai.crossplane.io
   names:
     kind: ProviderConfig
     listKind: ProviderConfigList
     plural: providerconfigs
     singular: providerconfig
-  scope: Cluster
+  scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .metadata.creationTimestamp
-      name: AGE
-      type: date
-    - jsonPath: .spec.credentials.secretRef.name
-      name: SECRET-NAME
-      priority: 1
-      type: string
-    name: v1beta1
+  - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: A ProviderConfig configures a Keycloak provider.
         properties:
           apiVersion:
             description: |-
@@ -45,70 +36,42 @@ spec:
           metadata:
             type: object
           spec:
-            description: |-
-              ProviderConfigSpec defines the desired state of a ProviderConfig.
-              Credentials must be a JSON secret with keys: url, base_path, realm,
-              client_id, client_secret, root_ca_certificate.
+            description: ProviderConfigSpec defines the desired state of a ProviderConfig.
             properties:
-              credentials:
-                description: Credentials required to authenticate to this provider.
+              baseURL:
+                description: BaseURL is the LocalAI base URL.
+                type: string
+              clientID:
+                description: ClientID for client credentials.
+                type: string
+              clientSecretRef:
+                description: ClientSecretRef references the secret holding client
+                  secret.
                 properties:
-                  env:
-                    description: |-
-                      Env is a reference to an environment variable that contains credentials
-                      that must be used to connect to the provider.
-                    properties:
-                      name:
-                        description: Name is the name of an environment variable.
-                        type: string
-                    required:
-                    - name
-                    type: object
-                  fs:
-                    description: |-
-                      Fs is a reference to a filesystem location that contains credentials that
-                      must be used to connect to the provider.
-                    properties:
-                      path:
-                        description: Path is a filesystem path.
-                        type: string
-                    required:
-                    - path
-                    type: object
-                  secretRef:
-                    description: |-
-                      A SecretRef is a reference to a secret key that contains the credentials
-                      that must be used to connect to the provider.
-                    properties:
-                      key:
-                        description: The key to select.
-                        type: string
-                      name:
-                        description: Name of the secret.
-                        type: string
-                      namespace:
-                        description: Namespace of the secret.
-                        type: string
-                    required:
-                    - key
-                    - name
-                    - namespace
-                    type: object
-                  source:
-                    description: Source of the provider credentials.
-                    enum:
-                    - Secret
-                    - Environment
-                    - Filesystem
+                  key:
+                    description: The key to select.
+                    type: string
+                  name:
+                    description: Name of the secret.
+                    type: string
+                  namespace:
+                    description: Namespace of the secret.
                     type: string
                 required:
-                - source
+                - key
+                - name
+                - namespace
                 type: object
+              tokenURL:
+                description: TokenURL is the OAuth2 token endpoint (Keycloak).
+                type: string
             required:
-            - credentials
+            - baseURL
+            - clientID
+            - tokenURL
             type: object
           status:
-            description: A ProviderConfigStatus reflects the observed state of a ProviderConfig.
+            description: ProviderConfigStatus defines the observed state.
             properties:
               conditions:
                 description: Conditions of the resource.

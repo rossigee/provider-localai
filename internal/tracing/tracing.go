@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	tracerName       = "provider-keycloak"
+	tracerName       = "provider-localai"
 	resourceTypeAttr = "crossplane.resource.type"
 	resourceNameAttr = "crossplane.resource.name"
 	operationAttr    = "crossplane.operation"

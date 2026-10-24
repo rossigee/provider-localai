@@ -4,24 +4,23 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.21.0
-  name: clientrolemappings.rolemappings.keycloak.m.crossplane.io
+  name: settings.settings.localai.crossplane.io
 spec:
-  group: rolemappings.keycloak.m.crossplane.io
+  group: settings.localai.crossplane.io
   names:
     categories:
     - crossplane
     - managed
-    - keycloak
-    kind: ClientRoleMapping
-    listKind: ClientRoleMappingList
-    plural: clientrolemappings
-    singular: clientrolemapping
-  scope: Namespaced
+    - localai
+    kind: Settings
+    listKind: SettingsList
+    plural: settings
+    singular: settings
+  scope: Cluster
   versions:
-  - name: v1beta1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClientRoleMapping manages client role assignments for users.
         properties:
           apiVersion:
             description: |-
@@ -41,45 +40,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClientRoleMappingSpec defines the desired state of ClientRoleMapping.
             properties:
               forProvider:
-                description: ClientRoleMappingParameters are the configurable fields
-                  of a ClientRoleMapping.
                 properties:
-                  clientId:
-                    description: ClientId is the client ID (internal UUID).
+                  baseURL:
                     type: string
-                  realmId:
-                    description: RealmId is the ID of the realm.
-                    type: string
-                  roles:
-                    description: |-
-                      Roles is the list of roles to assign.
-
-                      The set is additive: this resource owns the roles it lists and no others,
-                      so several ClientRoleMapping resources may share one realm, user and
-                      client. Removing a role from this list removes that role from the user;
-                      it does not affect roles owned by another resource. Roles added to the
-                      user outside this resource are left alone.
-                    items:
-                      description: RoleMapping represents a role to be assigned.
-                      properties:
-                        id:
-                          description: Id is the ID of the role.
-                          type: string
-                        name:
-                          description: Name is the name of the role.
-                          type: string
-                      type: object
-                    type: array
-                  userId:
-                    description: UserId is the ID of the user.
-                    type: string
-                required:
-                - clientId
-                - realmId
-                - userId
                 type: object
               managementPolicies:
                 default:
@@ -140,27 +105,9 @@ spec:
             - forProvider
             type: object
           status:
-            description: ClientRoleMappingStatus defines the observed state of ClientRoleMapping.
             properties:
-              appliedRoles:
-                description: |-
-                  AppliedRoles is the set of roles this resource has applied to the user.
-
-                  It records ownership, not the user's whole role set, and is how the
-                  resource distinguishes its own roles from those of another resource
-                  sharing the same user and client. Only roles listed here are removed when
-                  the resource is deleted.
-                items:
-                  description: RoleMapping represents a role to be assigned.
-                  properties:
-                    id:
-                      description: Id is the ID of the role.
-                      type: string
-                    name:
-                      description: Name is the name of the role.
-                      type: string
-                  type: object
-                type: array
+              atProvider:
+                type: object
               conditions:
                 description: Conditions of the resource.
                 items:

@@ -4,25 +4,23 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.21.0
-  name: authorizationpolicies.authorizationpolicy.keycloak.m.crossplane.io
+  name: skills.skill.localai.crossplane.io
 spec:
-  group: authorizationpolicy.keycloak.m.crossplane.io
+  group: skill.localai.crossplane.io
   names:
     categories:
     - crossplane
     - managed
-    - keycloak
-    kind: AuthorizationPolicy
-    listKind: AuthorizationPolicyList
-    plural: authorizationpolicies
-    singular: authorizationpolicy
-  scope: Namespaced
+    - localai
+    kind: Skill
+    listKind: SkillList
+    plural: skills
+    singular: skill
+  scope: Cluster
   versions:
-  - name: v1beta1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: An AuthorizationPolicy manages Keycloak authorization policies
-          for fine-grained access control.
         properties:
           apiVersion:
             description: |-
@@ -42,42 +40,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: AuthorizationPolicySpec defines the desired state of an AuthorizationPolicy.
+            description: SkillSpec defines the desired state.
             properties:
               forProvider:
-                description: AuthorizationPolicyParameters are the configurable fields
-                  of an AuthorizationPolicy.
+                description: SkillParameters define the desired state of a LocalAI
+                  Skill.
                 properties:
-                  clientId:
-                    description: ClientId is the ID of the client.
-                    type: string
-                  config:
-                    additionalProperties:
-                      type: string
-                    description: Config is the policy-specific configuration as key-value
-                      pairs.
-                    type: object
                   description:
-                    description: Description is a description of the policy.
-                    type: string
-                  logic:
-                    description: Logic is the policy logic (POSITIVE or NEGATIVE).
+                    description: Description of the skill.
                     type: string
                   name:
-                    description: Name is the policy name.
-                    type: string
-                  realmId:
-                    description: RealmId is the ID of the realm.
-                    type: string
-                  type:
-                    description: Type is the policy type (e.g., "role", "user", "resource",
-                      "scope", "aggregate").
+                    description: Name of the skill in LocalAI.
                     type: string
                 required:
-                - clientId
                 - name
-                - realmId
-                - type
                 type: object
               managementPolicies:
                 default:
@@ -138,9 +114,14 @@ spec:
             - forProvider
             type: object
           status:
-            description: AuthorizationPolicyStatus defines the observed state of an
-              AuthorizationPolicy.
+            description: SkillStatus defines the observed state.
             properties:
+              atProvider:
+                description: SkillObservation is the observed state.
+                properties:
+                  name:
+                    type: string
+                type: object
               conditions:
                 description: Conditions of the resource.
                 items:

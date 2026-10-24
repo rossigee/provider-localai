@@ -4,24 +4,23 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.21.0
-  name: components.component.keycloak.m.crossplane.io
+  name: models.model.localai.crossplane.io
 spec:
-  group: component.keycloak.m.crossplane.io
+  group: model.localai.crossplane.io
   names:
     categories:
     - crossplane
     - managed
-    - keycloak
-    kind: Component
-    listKind: ComponentList
-    plural: components
-    singular: component
-  scope: Namespaced
+    - localai
+    kind: Model
+    listKind: ModelList
+    plural: models
+    singular: model
+  scope: Cluster
   versions:
-  - name: v1beta1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Component manages generic Keycloak components.
         properties:
           apiVersion:
             description: |-
@@ -41,40 +40,15 @@ spec:
           metadata:
             type: object
           spec:
-            description: ComponentSpec defines the desired state of Component.
             properties:
               forProvider:
-                description: ComponentParameters are the configurable fields of a
-                  Component.
                 properties:
-                  config:
-                    additionalProperties:
-                      items:
-                        type: string
-                      type: array
-                    description: Config is the component configuration as key-value
-                      pairs.
-                    type: object
+                  backend:
+                    type: string
                   name:
-                    description: Name is the name of the component.
-                    type: string
-                  providerId:
-                    description: ProviderId is the ID of the component provider.
-                    type: string
-                  providerType:
-                    description: ProviderType is the type of the component provider
-                      (e.g., "ldap", "org.keycloak.keys.KeyProvider").
-                    type: string
-                  realmId:
-                    description: RealmId is the ID of the realm.
-                    type: string
-                  subType:
-                    description: SubType is the component sub type.
                     type: string
                 required:
                 - name
-                - providerType
-                - realmId
                 type: object
               managementPolicies:
                 default:
@@ -135,8 +109,12 @@ spec:
             - forProvider
             type: object
           status:
-            description: ComponentStatus defines the observed state of Component.
             properties:
+              atProvider:
+                properties:
+                  name:
+                    type: string
+                type: object
               conditions:
                 description: Conditions of the resource.
                 items:

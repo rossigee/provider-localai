@@ -1,6 +1,6 @@
 # ====================================================================================
 # Setup Project
-PROJECT_NAME := provider-keycloak
+PROJECT_NAME := provider-localai
 PROJECT_REPO := github.com/rossigee/$(PROJECT_NAME)
 export CROSSPLANE_VERSION ?= 2.5.0
 
@@ -33,7 +33,7 @@ GOLANGCILINT_VERSION ?= 2.14.0
 # ====================================================================================
 # Setup Images
 
-IMAGES = provider-keycloak
+IMAGES = provider-localai
 REGISTRY_ORGS = ghcr.io/rossigee
 -include build/makelib/imagelight.mk
 
@@ -42,12 +42,12 @@ REGISTRY_ORGS = ghcr.io/rossigee
 
 XPKG_REG_ORGS ?= ghcr.io/rossigee
 XPKG_REG_ORGS_NO_PROMOTE ?= ghcr.io/rossigee
-XPKGS = provider-keycloak
+XPKGS = provider-localai
 -include build/makelib/xpkg.mk
 
 # NOTE(hasheddan): we force image building to happen prior to xpkg build so that
 # we ensure image is present in daemon.
-xpkg.build.provider-keycloak: do.build.images
+xpkg.build.provider-localai: do.build.images
 
 # Ensure CLI is available for package builds and publishing
 $(foreach x,$(XPKGS),$(eval xpkg.build.$(x): $(CROSSPLANE_CLI)))
@@ -66,12 +66,12 @@ publish.artifacts:
 	fi
 	$(foreach r,$(XPKG_REG_ORGS), $(foreach x,$(XPKGS),@$(MAKE) xpkg.release.publish.$(r).$(x)))
 	$(foreach r,$(REGISTRY_ORGS), $(foreach i,$(IMAGES),@$(MAKE) img.release.publish.$(r).$(i)))
-xpkg.release.publish.ghcr.io/rossigee.provider-keycloak:
-	@$(foreach p,$(XPKG_LINUX_PLATFORMS),$(MAKE) xpkg.build.provider-keycloak PLATFORM=$(p) || exit 1;)
+xpkg.release.publish.ghcr.io/rossigee.provider-localai:
+	@$(foreach p,$(XPKG_LINUX_PLATFORMS),$(MAKE) xpkg.build.provider-localai PLATFORM=$(p) || exit 1;)
 	@$(CROSSPLANE_CLI) xpkg push \
-		$(foreach p,$(XPKG_LINUX_PLATFORMS),--package-files $(XPKG_OUTPUT_DIR)/$(p)/provider-keycloak-$(VERSION).xpkg ) \
-		ghcr.io/rossigee/provider-keycloak:$(VERSION)
-	@$(OK) Pushed package ghcr.io/rossigee/provider-keycloak:$(VERSION)
+		$(foreach p,$(XPKG_LINUX_PLATFORMS),--package-files $(XPKG_OUTPUT_DIR)/$(p)/provider-localai-$(VERSION).xpkg ) \
+		ghcr.io/rossigee/provider-localai:$(VERSION)
+	@$(OK) Pushed package ghcr.io/rossigee/provider-localai:$(VERSION)
 
 
 fallthrough: submodules
@@ -195,5 +195,5 @@ help-special: crossplane.help
 # runtime image is never built/tagged locally. The runtime binary is already
 # embedded in the xpkg, so publishing this image would only overwrite the
 # xpkg's package.yaml.
-img.release.publish.ghcr.io/rossigee.provider-keycloak:
+img.release.publish.ghcr.io/rossigee.provider-localai:
 	@:

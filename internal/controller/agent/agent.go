@@ -8,11 +8,15 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	laiclient "github.com/rossigee/localai-client/client"
 	agentv1alpha1 "github.com/rossigee/provider-localai/apis/agent/v1alpha1"
+	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
+	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 const (
@@ -26,6 +30,15 @@ const (
 
 	controllerName = "agents.agent.localai.crossplane.io"
 )
+
+func getProviderConfig(ctx context.Context, kube client.Client, cr *agentv1alpha1.Agent) (*v1beta1.ProviderConfig, error) {
+	pcName := cr.GetProviderConfigReference().Name
+	pc := &v1beta1.ProviderConfig{}
+	if err := kube.Get(ctx, client.ObjectKey{Name: pcName}, pc); err != nil {
+		return nil, errors.Wrap(err, errGetProviderConfig)
+	}
+	return pc, nil
+}
 
 // Setup registers the Agent controller.
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
@@ -49,9 +62,17 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if !ok {
 		return nil, errors.New(errNotAgent)
 	}
-	// TODO: resolve ProviderConfig -> laiclient.Config (baseURL, tokenURL, clientID/secret from secret refs)
-	_ = cr
-	cfg := laiclient.Config{} // populate from ProviderConfig + secrets
+	pc, err := getProviderConfig(ctx, c.kube, cr)
+	if err != nil {
+		return nil, err
+	}
+	if pc.Status.GetCondition(xpv1.TypeReady).Status != corev1.ConditionTrue {
+		return nil, errors.New(errProviderNotReady)
+	}
+	cfg, err := clients.GetLocalAIConfig(ctx, pc, c.kube)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot build LocalAI client config")
+	}
 	return &external{client: laiclient.New(cfg)}, nil
 }
 
@@ -73,15 +94,30 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+func agentFromCR(cr *agentv1alpha1.Agent) laiclient.Agent {
+	p := cr.Spec.ForProvider
+	out := laiclient.Agent{
+		Name:          p.Name,
+		Model:         p.Model,
+		Description:   p.Description,
+		SystemPrompt:  p.SystemPrompt,
+		Skills:        p.Skills,
+		EnableSkills:  p.EnableSkills,
+		AllowedTools:  p.AllowedTools,
+		ExcludedTools: p.ExcludedTools,
+	}
+	for _, s := range p.MCPServers {
+		out.MCPServers = append(out.MCPServers, laiclient.MCPServer{
+			URL:   s.URL,
+			Token: s.Token,
+		})
+	}
+	return out
+}
+
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*agentv1alpha1.Agent)
-	_, err := e.client.CreateAgent(ctx, laiclient.Agent{
-		Name:         cr.Spec.ForProvider.Name,
-		Model:        cr.Spec.ForProvider.Model,
-		Description:  cr.Spec.ForProvider.Description,
-		SystemPrompt: cr.Spec.ForProvider.SystemPrompt,
-		Skills:       cr.Spec.ForProvider.Skills,
-	})
+	_, err := e.client.CreateAgent(ctx, agentFromCR(cr))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
 	}
@@ -90,13 +126,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*agentv1alpha1.Agent)
-	_, err := e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, laiclient.Agent{
-		Name:         cr.Spec.ForProvider.Name,
-		Model:        cr.Spec.ForProvider.Model,
-		Description:  cr.Spec.ForProvider.Description,
-		SystemPrompt: cr.Spec.ForProvider.SystemPrompt,
-		Skills:       cr.Spec.ForProvider.Skills,
-	})
+	_, err := e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, agentFromCR(cr))
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
 	}

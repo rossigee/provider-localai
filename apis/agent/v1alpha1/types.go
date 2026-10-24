@@ -5,6 +5,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// MCPServerSpec is a remote MCP server the agent may use.
+type MCPServerSpec struct {
+	// URL of the MCP Streamable HTTP / SSE endpoint.
+	// +kubebuilder:validation:Required
+	URL string `json:"url"`
+
+	// Token is an optional bearer token. Prefer proxy sidecars that inject
+	// tokens so this field stays empty in Git.
+	// +optional
+	Token string `json:"token,omitempty"`
+}
+
 // AgentParameters define the desired state of a LocalAI Agent.
 type AgentParameters struct {
 	// Name of the agent in LocalAI.
@@ -26,6 +38,23 @@ type AgentParameters struct {
 	// Skills is the list of skill names available to the agent.
 	// +optional
 	Skills []string `json:"skills,omitempty"`
+
+	// EnableSkills turns on the LocalAGI skills service for this agent.
+	// +optional
+	EnableSkills *bool `json:"enableSkills,omitempty"`
+
+	// MCPServers is the per-agent MCP allowlist. Agents do not inherit
+	// model-level mcp.remote from LocalAI model configs.
+	// +optional
+	MCPServers []MCPServerSpec `json:"mcpServers,omitempty"`
+
+	// AllowedTools, when set, is the only tool names offered to the model.
+	// +optional
+	AllowedTools []string `json:"allowedTools,omitempty"`
+
+	// ExcludedTools are never offered, even if also listed in AllowedTools.
+	// +optional
+	ExcludedTools []string `json:"excludedTools,omitempty"`
 }
 
 // AgentObservation is the observed state of a LocalAI Agent.

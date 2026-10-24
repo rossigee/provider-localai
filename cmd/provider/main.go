@@ -129,16 +129,16 @@ func stateManagedLists() []resource.ManagedList {
 }
 
 func main() {
-	o, err := parseOptions(filepath.Base(os.Args[0]), "Keycloak support for Crossplane.", os.Args[1:])
+	o, err := parseOptions(filepath.Base(os.Args[0]), "LocalAI support for Crossplane.", os.Args[1:])
 	kingpin.FatalIfError(err, "Cannot parse flags")
 
 	zl := zap.New(zap.UseDevMode(o.debug))
-	log := logging.NewLogrLogger(zl.WithName("provider-keycloak"))
+	log := logging.NewLogrLogger(zl.WithName("provider-localai"))
 
 	ctrl.SetLogger(zl)
 
 	log.Info("Provider starting up",
-		"provider", "provider-keycloak",
+		"provider", "provider-localai",
 		"version", version.Version,
 		"go-version", runtime.Version(),
 		"platform", runtime.GOOS+"/"+runtime.GOARCH,
@@ -162,7 +162,7 @@ func main() {
 
 	ctrlOpts := o.controllerOptions(log, mrStateMetrics)
 
-	kingpin.FatalIfError(controller.Setup(mgr, ctrlOpts), "Cannot setup Keycloak controllers")
+	kingpin.FatalIfError(controller.Setup(mgr, ctrlOpts), "Cannot setup LocalAI controllers")
 
 	for _, list := range stateManagedLists() {
 		kingpin.FatalIfError(mgr.Add(statemetrics.NewMRStateRecorder(mgr.GetClient(), ctrlOpts.Logger, ctrlOpts.MetricOptions.MRStateMetrics, list, ctrlOpts.MetricOptions.PollStateMetricInterval)), "Cannot register state metrics")
