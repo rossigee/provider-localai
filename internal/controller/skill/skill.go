@@ -32,7 +32,7 @@ const (
 func getProviderConfig(ctx context.Context, kube client.Client, cr *skillv1alpha1.Skill) (*v1beta1.ProviderConfig, error) {
 	pcName := cr.GetProviderConfigReference().Name
 	pc := &v1beta1.ProviderConfig{}
-	if err := kube.Get(ctx, client.ObjectKey{Name: pcName}, pc); err != nil {
+	if err := kube.Get(ctx, client.ObjectKey{Name: pcName, Namespace: "crossplane-system"}, pc); err != nil {
 		return nil, errors.Wrap(err, "cannot get ProviderConfig")
 	}
 	return pc, nil
