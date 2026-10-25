@@ -55,6 +55,15 @@ type AgentParameters struct {
 	// ExcludedTools are never offered, even if also listed in AllowedTools.
 	// +optional
 	ExcludedTools []string `json:"excludedTools,omitempty"`
+
+	// APIKeySecretRef references a Secret key holding the LocalAI API key the
+	// agent uses to call LocalAI's own API. Required when LocalAI has
+	// authentication enabled: LocalAI only generates a per-user agent key for
+	// callers that have a row in the users table, and a provider authenticating
+	// with a static API key has none, so creation would otherwise fail with a
+	// user_api_keys foreign key violation.
+	// +optional
+	APIKeySecretRef *xpv1.SecretKeySelector `json:"apiKeySecretRef,omitempty"`
 }
 
 // AgentObservation is the observed state of a LocalAI Agent.
