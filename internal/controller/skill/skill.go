@@ -85,7 +85,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr := mg.(*skillv1alpha1.Skill)
 	s, err := e.client.GetSkill(ctx, cr.Spec.ForProvider.Name)
 	if err != nil {
-		return managed.ExternalObservation{ResourceExists: false}, nil
+		if laiclient.IsNotFound(err) {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetSkill)
 	}
 	cr.Status.AtProvider.Name = s.Name
 	cr.Status.SetConditions(xpv1.Available())

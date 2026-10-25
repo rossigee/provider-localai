@@ -35,7 +35,10 @@ type AgentParameters struct {
 	// +optional
 	SystemPrompt string `json:"systemPrompt,omitempty"`
 
-	// Skills is the list of skill names available to the agent.
+	// Skills is the list of skill names available to the agent. It is sent as
+	// selected_skills. LocalAI builds whose agent API has no selected_skills
+	// field drop it on write, which leaves every skill available, so it is not
+	// part of the drift comparison.
 	// +optional
 	Skills []string `json:"skills,omitempty"`
 

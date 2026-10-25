@@ -125,8 +125,11 @@ spec:
                     description: Name of the agent in LocalAI.
                     type: string
                   skills:
-                    description: Skills is the list of skill names available to the
-                      agent.
+                    description: |-
+                      Skills is the list of skill names available to the agent. It is sent as
+                      selected_skills. LocalAI builds whose agent API has no selected_skills
+                      field drop it on write, which leaves every skill available, so it is not
+                      part of the drift comparison.
                     items:
                       type: string
                     type: array

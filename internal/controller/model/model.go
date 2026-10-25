@@ -21,6 +21,7 @@ import (
 
 const (
 	errNotModel    = "managed resource is not a Model"
+	errGetModel    = "cannot list LocalAI models"
 	controllerName = "models.model.localai.crossplane.io"
 )
 
@@ -76,7 +77,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr := mg.(*modelv1alpha1.Model)
 	models, err := e.client.ListModels(ctx)
 	if err != nil {
-		return managed.ExternalObservation{ResourceExists: false}, nil
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetModel)
 	}
 	for _, m := range models {
 		if m.Name == cr.Spec.ForProvider.Name {
