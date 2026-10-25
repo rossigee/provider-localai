@@ -92,6 +92,10 @@ jobs:
           make reviewable
           git diff --exit-code
 
+      - name: Report govulncheck findings
+        if: failure()
+        run: cat /tmp/govulncheck.out
+
   unit-tests:
     runs-on: ubuntu-24.04
     needs: detect-noop
