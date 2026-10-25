@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package features defines feature flags for the Keycloak provider.
+// Package features defines feature flags for the LocalAI provider.
 package features
 
 import "github.com/crossplane/crossplane-runtime/v2/pkg/feature"

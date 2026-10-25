@@ -1,0 +1,23 @@
+apiVersion: agent.localai.crossplane.io/v1alpha1
+kind: Agent
+metadata:
+  name: bookkeeping
+spec:
+  forProvider:
+    name: bookkeeping
+    model: qwen3-8b
+    description: Bookkeeping via Odoo MCP only.
+    systemPrompt: |
+      You keep the books. Use only the Odoo MCP tools.
+    enableSkills: true
+    skills:
+      - bookkeeping
+    mcpServers:
+      - url: http://odoo-mcp.localai.svc.cluster.local:8080/stream
+    # Required when LocalAI has authentication enabled.
+    apiKeySecretRef:
+      namespace: crossplane-system
+      name: localai-provider-credentials
+      key: token
+  providerConfigRef:
+    name: localai

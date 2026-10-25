@@ -15,7 +15,8 @@ type ProviderConfigSpec struct {
 	// BaseURL is the LocalAI base URL.
 	BaseURL string `json:"baseURL"`
 
-	// TokenURL is the OAuth2 token endpoint (Keycloak).
+	// TokenURL is an OAuth2 token endpoint, for deployments that front LocalAI
+	// with something that accepts bearer tokens.
 	// Deprecated: LocalAI's API does not accept OIDC access tokens. Use
 	// Credentials with a LocalAI API key instead.
 	TokenURL string `json:"tokenURL,omitempty"`

@@ -156,8 +156,8 @@ github.com/rossigee/crossplane-runtime/v2 v2.5.0 h1:vffoYZrJBxdFU2i1IBZQB+mDjsMP
 github.com/rossigee/crossplane-runtime/v2 v2.5.0/go.mod h1:U9Wf0etSG2hKFSJKiIQK59IcXJcc3GF9JG/ELju6NEc=
 github.com/rossigee/crossplane/apis/v2 v2.5.0-rc.0.0.20260923113947-5fc6b7aa10a3 h1:CwO4dptcHtVxVXiqW1dAXhrshiZlQV7vgoA3hYBplak=
 github.com/rossigee/crossplane/apis/v2 v2.5.0-rc.0.0.20260923113947-5fc6b7aa10a3/go.mod h1:OBNx+tl5RQh31Hqo2Q1KZ5tlwZXUIetAvpKKozP8HhU=
-github.com/rossigee/provider-keycloak v0.21.0 h1:Kc+ja/GVZAv4xj8sWtop90JQm41Ip0CogDz41wDhTXM=
-github.com/rossigee/provider-keycloak v0.21.0/go.mod h1:caJoovU9Li6nU6aRau8kBBd/ZEe/CcFN9jzsJlzBZHs=
+github.com/rossigee/localai-client v0.1.0 h1:YUBpxuIfoKwHPqJaw+I+MJ/pRUqaBtaDe0ovPQR/1nQ=
+github.com/rossigee/localai-client v0.1.0/go.mod h1:8Kue5jfKQDTKdoQPUHbx7hjXpuWNRsU8GrumGGh/3qc=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/spf13/afero v1.15.0 h1:b/YBCLWAJdFWJTN9cLhiXXcD7mzKn9Dm86dNnfyQw1I=
 github.com/spf13/afero v1.15.0/go.mod h1:NC2ByUVxtQs4b3sIUphxK0NioZnmxgyCrfzeuq8lxMg=
