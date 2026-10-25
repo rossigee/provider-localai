@@ -62,6 +62,29 @@ spec:
                     items:
                       type: string
                     type: array
+                  apiKeySecretRef:
+                    description: |-
+                      APIKeySecretRef references a Secret key holding the LocalAI API key the
+                      agent uses to call LocalAI's own API. Required when LocalAI has
+                      authentication enabled: LocalAI only generates a per-user agent key for
+                      callers that have a row in the users table, and a provider authenticating
+                      with a static API key has none, so creation would otherwise fail with a
+                      user_api_keys foreign key violation.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
                   description:
                     description: Description of the agent.
                     type: string
@@ -102,8 +125,11 @@ spec:
                     description: Name of the agent in LocalAI.
                     type: string
                   skills:
-                    description: Skills is the list of skill names available to the
-                      agent.
+                    description: |-
+                      Skills is the list of skill names available to the agent. It is sent as
+                      selected_skills. LocalAI builds whose agent API has no selected_skills
+                      field drop it on write, which leaves every skill available, so it is not
+                      part of the drift comparison.
                     items:
                       type: string
                     type: array

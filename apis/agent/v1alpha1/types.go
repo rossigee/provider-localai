@@ -35,7 +35,10 @@ type AgentParameters struct {
 	// +optional
 	SystemPrompt string `json:"systemPrompt,omitempty"`
 
-	// Skills is the list of skill names available to the agent.
+	// Skills is the list of skill names available to the agent. It is sent as
+	// selected_skills. LocalAI builds whose agent API has no selected_skills
+	// field drop it on write, which leaves every skill available, so it is not
+	// part of the drift comparison.
 	// +optional
 	Skills []string `json:"skills,omitempty"`
 
@@ -55,6 +58,15 @@ type AgentParameters struct {
 	// ExcludedTools are never offered, even if also listed in AllowedTools.
 	// +optional
 	ExcludedTools []string `json:"excludedTools,omitempty"`
+
+	// APIKeySecretRef references a Secret key holding the LocalAI API key the
+	// agent uses to call LocalAI's own API. Required when LocalAI has
+	// authentication enabled: LocalAI only generates a per-user agent key for
+	// callers that have a row in the users table, and a provider authenticating
+	// with a static API key has none, so creation would otherwise fail with a
+	// user_api_keys foreign key violation.
+	// +optional
+	APIKeySecretRef *xpv1.SecretKeySelector `json:"apiKeySecretRef,omitempty"`
 }
 
 // AgentObservation is the observed state of a LocalAI Agent.

@@ -21,6 +21,7 @@ import (
 
 const (
 	errNotModel    = "managed resource is not a Model"
+	errGetModel    = "cannot list LocalAI models"
 	controllerName = "models.model.localai.crossplane.io"
 )
 
@@ -61,7 +62,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI client config")
 	}
-	return &external{client: laiclient.New(cfg)}, nil
+	laic, err := laiclient.New(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot build LocalAI client")
+	}
+	return &external{client: laic}, nil
 }
 
 type external struct{ client *laiclient.Client }
@@ -72,11 +77,12 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr := mg.(*modelv1alpha1.Model)
 	models, err := e.client.ListModels(ctx)
 	if err != nil {
-		return managed.ExternalObservation{ResourceExists: false}, nil
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetModel)
 	}
 	for _, m := range models {
 		if m.Name == cr.Spec.ForProvider.Name {
 			cr.Status.AtProvider.Name = m.Name
+			cr.Status.SetConditions(xpv1.Available())
 			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 		}
 	}

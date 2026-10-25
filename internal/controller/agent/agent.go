@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -73,10 +74,43 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI client config")
 	}
-	return &external{client: laiclient.New(cfg)}, nil
+	laic, err := laiclient.New(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot build LocalAI client")
+	}
+
+	apiKey, err := resolveAgentAPIKey(ctx, c.kube, cr)
+	if err != nil {
+		return nil, err
+	}
+	return &external{client: laic, apiKey: apiKey}, nil
 }
 
-type external struct{ client *laiclient.Client }
+// resolveAgentAPIKey reads the key the agent uses to call LocalAI's own API.
+func resolveAgentAPIKey(ctx context.Context, kube client.Client, cr *agentv1alpha1.Agent) (string, error) {
+	ref := cr.Spec.ForProvider.APIKeySecretRef
+	if ref == nil {
+		return "", nil
+	}
+	key := ref.Key
+	if key == "" {
+		key = "token"
+	}
+	secret := &corev1.Secret{}
+	if err := kube.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: ref.Namespace}, secret); err != nil {
+		return "", errors.Wrapf(err, "cannot get agent API key secret %s/%s", ref.Namespace, ref.Name)
+	}
+	raw, ok := secret.Data[key]
+	if !ok {
+		return "", errors.Errorf("key %q not found in secret %s/%s", key, ref.Namespace, ref.Name)
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+type external struct {
+	client *laiclient.Client
+	apiKey string
+}
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
@@ -84,27 +118,74 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr := mg.(*agentv1alpha1.Agent)
 	a, err := e.client.GetAgent(ctx, cr.Spec.ForProvider.Name)
 	if err != nil {
-		// not found -> not exists
-		return managed.ExternalObservation{ResourceExists: false}, nil
+		if laiclient.IsNotFound(err) {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetAgent)
 	}
 	cr.Status.AtProvider.Name = a.Name
+	cr.Status.SetConditions(xpv1.Available())
 	return managed.ExternalObservation{
 		ResourceExists:   true,
-		ResourceUpToDate: a.Model == cr.Spec.ForProvider.Model,
+		ResourceUpToDate: agentUpToDate(cr, a),
 	}, nil
 }
 
-func agentFromCR(cr *agentv1alpha1.Agent) laiclient.Agent {
+// agentUpToDate compares the desired agent against what LocalAI reports, so
+// edits to any field are pushed rather than only model changes.
+func agentUpToDate(cr *agentv1alpha1.Agent, a *laiclient.Agent) bool {
+	p := cr.Spec.ForProvider
+	if a.Model != p.Model || a.Description != p.Description || a.SystemPrompt != p.SystemPrompt {
+		return false
+	}
+	// Skills are deliberately not compared. LocalAI builds whose agent API has
+	// no selected_skills field drop it on write, so comparing it would report
+	// drift forever and rewrite the agent on every poll.
+	if !equalStrings(a.AllowedTools, p.AllowedTools) || !equalStrings(a.ExcludedTools, p.ExcludedTools) {
+		return false
+	}
+	if p.EnableSkills != nil && (a.EnableSkills == nil || *a.EnableSkills != *p.EnableSkills) {
+		return false
+	}
+	want := make([]laiclient.MCPServer, 0, len(p.MCPServers))
+	for _, s := range p.MCPServers {
+		want = append(want, laiclient.MCPServer{URL: s.URL, Token: s.Token})
+	}
+	if len(a.MCPServers) != len(want) {
+		return false
+	}
+	for i := range want {
+		if a.MCPServers[i].URL != want[i].URL || a.MCPServers[i].Token != want[i].Token {
+			return false
+		}
+	}
+	return true
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func agentFromCR(cr *agentv1alpha1.Agent, apiKey string) laiclient.Agent {
 	p := cr.Spec.ForProvider
 	out := laiclient.Agent{
 		Name:          p.Name,
 		Model:         p.Model,
 		Description:   p.Description,
 		SystemPrompt:  p.SystemPrompt,
-		Skills:        p.Skills,
+		SelectedSkills: p.Skills,
 		EnableSkills:  p.EnableSkills,
 		AllowedTools:  p.AllowedTools,
 		ExcludedTools: p.ExcludedTools,
+		APIKey:        apiKey,
 	}
 	for _, s := range p.MCPServers {
 		out.MCPServers = append(out.MCPServers, laiclient.MCPServer{
@@ -117,7 +198,7 @@ func agentFromCR(cr *agentv1alpha1.Agent) laiclient.Agent {
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*agentv1alpha1.Agent)
-	_, err := e.client.CreateAgent(ctx, agentFromCR(cr))
+	_, err := e.client.CreateAgent(ctx, agentFromCR(cr, e.apiKey))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
 	}
@@ -126,7 +207,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*agentv1alpha1.Agent)
-	_, err := e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, agentFromCR(cr))
+	_, err := e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, agentFromCR(cr, e.apiKey))
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
 	}

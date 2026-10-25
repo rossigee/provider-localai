@@ -3,6 +3,7 @@ package settings
 import (
 	"context"
 
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
@@ -42,6 +43,9 @@ type external struct{}
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
+	if cr, ok := mg.(*settingsv1alpha1.Settings); ok {
+		cr.Status.SetConditions(xpv1.Available())
+	}
 	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 }
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {

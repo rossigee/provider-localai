@@ -42,11 +42,88 @@ spec:
                 description: BaseURL is the LocalAI base URL.
                 type: string
               clientID:
-                description: ClientID for client credentials.
+                description: |-
+                  ClientID for client credentials.
+                  Deprecated: use Credentials with a LocalAI API key instead.
                 type: string
               clientSecretRef:
-                description: ClientSecretRef references the secret holding client
-                  secret.
+                description: |-
+                  ClientSecretRef references the secret holding client secret.
+                  Deprecated: use Credentials with a LocalAI API key instead.
+                properties:
+                  key:
+                    description: The key to select.
+                    type: string
+                  name:
+                    description: Name of the secret.
+                    type: string
+                  namespace:
+                    description: Namespace of the secret.
+                    type: string
+                required:
+                - key
+                - name
+                - namespace
+                type: object
+              credentials:
+                description: |-
+                  Credentials required to authenticate to this provider. The referenced
+                  secret holds a LocalAI API key, which is sent as a bearer token. This is
+                  the same credential shape the other providers in this cluster use.
+                properties:
+                  env:
+                    description: |-
+                      Env is a reference to an environment variable that contains credentials
+                      that must be used to connect to the provider.
+                    properties:
+                      name:
+                        description: Name is the name of an environment variable.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  fs:
+                    description: |-
+                      Fs is a reference to a filesystem location that contains credentials that
+                      must be used to connect to the provider.
+                    properties:
+                      path:
+                        description: Path is a filesystem path.
+                        type: string
+                    required:
+                    - path
+                    type: object
+                  secretRef:
+                    description: |-
+                      A SecretRef is a reference to a secret key that contains the credentials
+                      that must be used to connect to the provider.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  source:
+                    description: Source of the provider credentials.
+                    enum:
+                    - Secret
+                    type: string
+                required:
+                - source
+                type: object
+              rootCACertificateRef:
+                description: |-
+                  RootCACertificateRef references a secret containing the CA certificate(s)
+                  to trust when connecting to LocalAI. If omitted, the system CA pool is used.
                 properties:
                   key:
                     description: The key to select.
@@ -63,12 +140,13 @@ spec:
                 - namespace
                 type: object
               tokenURL:
-                description: TokenURL is the OAuth2 token endpoint (Keycloak).
+                description: |-
+                  TokenURL is the OAuth2 token endpoint (Keycloak).
+                  Deprecated: LocalAI's API does not accept OIDC access tokens. Use
+                  Credentials with a LocalAI API key instead.
                 type: string
             required:
             - baseURL
-            - clientID
-            - tokenURL
             type: object
           status:
             description: ProviderConfigStatus defines the observed state.
