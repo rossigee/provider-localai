@@ -177,15 +177,15 @@ func equalStrings(a, b []string) bool {
 func agentFromCR(cr *agentv1alpha1.Agent, apiKey string) laiclient.Agent {
 	p := cr.Spec.ForProvider
 	out := laiclient.Agent{
-		Name:          p.Name,
-		Model:         p.Model,
-		Description:   p.Description,
-		SystemPrompt:  p.SystemPrompt,
+		Name:           p.Name,
+		Model:          p.Model,
+		Description:    p.Description,
+		SystemPrompt:   p.SystemPrompt,
 		SelectedSkills: p.Skills,
-		EnableSkills:  p.EnableSkills,
-		AllowedTools:  p.AllowedTools,
-		ExcludedTools: p.ExcludedTools,
-		APIKey:        apiKey,
+		EnableSkills:   p.EnableSkills,
+		AllowedTools:   p.AllowedTools,
+		ExcludedTools:  p.ExcludedTools,
+		APIKey:         apiKey,
 	}
 	for _, s := range p.MCPServers {
 		out.MCPServers = append(out.MCPServers, laiclient.MCPServer{
