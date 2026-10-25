@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.13] - 2026-10-25
+
+### Fixed
+
+- `golang.org/x/net` v0.58.0 -> v0.60.0, which fixes the HTTP/2 framing and
+  memory exhaustion advisories govulncheck reports against the version
+  pulled in by controller-runtime and the OpenTelemetry exporter
+  (GO-2026-6610, GO-2026-6603 and related). The matching `golang.org/x/mod`,
+  `x/sync`, `x/sys`, `x/term` and `x/text` versions moved with it.
+
+### Changed
+
+- `gofmt` the three files the linter rejected: import ordering in
+  `internal/clients/localai.go` and `internal/controller/settings/settings.go`
+  and the field alignment in `internal/controller/agent/agent.go`. Whitespace
+  only.
+
 ## [0.1.12] - 2026-10-25
 
 Repository cleanup. No API changes and no change in behaviour on the cluster.
