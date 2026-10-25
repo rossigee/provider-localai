@@ -141,7 +141,8 @@ spec:
                 type: object
               tokenURL:
                 description: |-
-                  TokenURL is the OAuth2 token endpoint (Keycloak).
+                  TokenURL is an OAuth2 token endpoint, for deployments that front LocalAI
+                  with something that accepts bearer tokens.
                   Deprecated: LocalAI's API does not accept OIDC access tokens. Use
                   Credentials with a LocalAI API key instead.
                 type: string

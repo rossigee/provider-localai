@@ -449,6 +449,7 @@ reviewable:
 	  TOTAL=$$(grep -c "^Vulnerability #" /tmp/govulncheck.out || true); \
 	  if [ "$$FIXED" -lt "$$TOTAL" ]; then \
 	    echo "govulncheck: $$TOTAL vulnerabilities found ($$FIXED unfixable, $$((TOTAL - FIXED)) fixable)"; \
+	    grep -E "^Vulnerability #|^  Module:|^    (Found|Fixed) in:" /tmp/govulncheck.out || true; \
 	    rm -f /tmp/govulncheck.out; exit 1; \
 	  else \
 	    echo "govulncheck: $$TOTAL unfixable vulnerabilities (no fix available), ignoring"; \
