@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.16] - 2026-10-26
+
+### Changed
+
+- Move to `github.com/rossigee/crossplane-runtime/v2` v2.5.1, the version
+  the rest of the fleet is standardising on. It brings
+  `sigs.k8s.io/controller-runtime` v0.25.1 and `k8s.io` v0.37.0 with it.
+- The CRDs are regenerated with controller-gen v0.22.0; only the
+  `controller-gen.kubebuilder.io/version` annotation changes.
+
 ## [0.1.15] - 2026-10-26
 
 ### Changed
