@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.14] - 2026-10-26
+
+### Fixed
+
+- Build and scan with Go 1.27.3. Go 1.27.1's standard library has twelve
+  known advisories (`crypto/x509` GO-2026-6809, `net/http`, `net/http/internal/http2`,
+  `net/textproto`, `crypto/tls`, `html/template`) and Go 1.27.2 still carries
+  GO-2026-6809. They are what made the `check-diff` job fail on every commit,
+  including the ones that never touched this code. `go.mod` requires 1.27.3
+  as well, so the provider binary is always linked against a patched standard
+  library.
+- `securego/gosec@master` and `trufflesecurity/trufflehog@main` are pinned to
+  v2.30.0 and v3.99.7. Branch references make a build change without a
+  commit and leave the version that ran unrecorded.
+
+### Changed
+
+- Require `github.com/rossigee/localai-client` v0.1.1, which requires Go
+  1.27.3, uses `golang.org/x/oauth2` v0.36.0 instead of v0.24.0, and carries
+  its own CI and tests.
+- The `reviewable` target prints the advisories govulncheck found instead of
+  only a count, and the `check-diff` job dumps the findings when it fails.
+- The Makefile's `GO_REQUIRED_VERSION` moves to 1.27.3, which is the version
+  the crossplane-providers audit expects.
+
 ## [0.1.13] - 2026-10-25
 
 ### Fixed

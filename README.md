@@ -1,36 +1,45 @@
 # provider-localai
 
-[![CI](https://github.com/rossigee/provider-localai/actions/workflows/ci.yml/badge.svg?branch=master)][ci]
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/rossigee/provider-localai/ci.yml?branch=master)][build]
+[![Version](https://img.shields.io/github/v/release/rossigee/provider-localai)][releases]
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+[build]: https://github.com/rossigee/provider-localai/actions/workflows/ci.yml
+[releases]: https://github.com/rossigee/provider-localai/releases
 
 A [Crossplane](https://crossplane.io/) provider that manages
 [LocalAI](https://localai.io/) resources through its admin API: agents, skills,
 models and settings.
 
-[ci]: https://github.com/rossigee/provider-localai/actions/workflows/ci.yml
+## Container Registry
 
-## Resources
+- **Primary**: `ghcr.io/rossigee/provider-localai:v0.1.14`
 
-| Kind | Scope | API |
-|---|---|---|
-| `Agent` | Cluster | `agent.localai.crossplane.io/v1alpha1` |
-| `Skill` | Cluster | `skill.localai.crossplane.io/v1alpha1` |
-| `Model` | Cluster | `model.localai.crossplane.io/v1alpha1` |
-| `Settings` | Cluster | `settings.localai.crossplane.io/v1alpha1` |
-| `ProviderConfig` | Namespaced | `localai.crossplane.io/v1beta1` |
+## Features
 
-## Install
+- Manages `Agent`, `Skill`, `Model` and `Settings` resources
+- Authenticates with a static LocalAI API key, the credential shape the rest
+  of the fleet uses
+- Verifies the LocalAI endpoint against a private CA rather than skipping
+  verification
+- Attaches MCP servers per agent
+- Native controller: no Terraform, no upjet
 
-```yaml
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-localai
-spec:
-  package: ghcr.io/rossigee/provider-localai:v0.1.12
+## Getting Started
+
+### Prerequisites
+
+- Kubernetes cluster with Crossplane `>= v2.5`
+- A LocalAI deployment with its admin API reachable from the cluster
+- A LocalAI API key
+
+### Installation
+
+```bash
+kubectl crossplane install provider ghcr.io/rossigee/provider-localai:v0.1.14
 ```
 
-## Authentication
+### Configuration
 
 LocalAI's API accepts only API keys: the legacy `LOCALAI_API_KEY` value, a
 per-user key, or a browser session ID. An OIDC access token is rejected with
@@ -71,7 +80,7 @@ spec:
 Use them only when LocalAI sits behind something that accepts OAuth2 bearer
 tokens.
 
-## Agents
+## Usage
 
 ```yaml
 apiVersion: agent.localai.crossplane.io/v1alpha1
@@ -114,7 +123,7 @@ leaves every skill available to the agent. Because the value cannot be read
 back, `skills` is excluded from the drift comparison; it is still sent, so a
 LocalAI build that persists it gets it.
 
-## Behaviour
+### Behaviour
 
 - `Observe` reads `/api/agents/{name}/config`. The plain agent endpoint only
   reports whether an agent is active.
@@ -123,17 +132,39 @@ LocalAI build that persists it gets it.
 - The whole desired agent (model, description, system prompt, tools, MCP
   servers) is compared, so edits converge instead of being ignored.
 
-## Building
+## Resource Types
+
+| Resource | API Group | Description |
+|----------|-----------|-------------|
+| Agent | `agent.localai.crossplane.io/v1alpha1` | LocalAI agents, with model, system prompt, skills and MCP servers |
+| Skill | `skill.localai.crossplane.io/v1alpha1` | Skills available to agents |
+| Model | `model.localai.crossplane.io/v1alpha1` | Models available to the LocalAI deployment |
+| Settings | `settings.localai.crossplane.io/v1alpha1` | LocalAI instance settings |
+| ProviderConfig | `localai.crossplane.io/v1beta1` | LocalAI endpoint, API key and private CA |
+
+## Development
 
 ```bash
-make go.build PLATFORMS=linux_amd64 VERSION=v0.1.12
-make do.build.images PLATFORMS=linux_amd64 VERSION=v0.1.12
-go test ./...
+# Build
+make go.build PLATFORMS=linux_amd64 VERSION=v0.1.14
+
+# Test
+make test
+
+# Lint
+make lint
+
+# Generate
+make generate
 ```
 
 The LocalAI API client lives in
 [`github.com/rossigee/localai-client`](https://github.com/rossigee/localai-client).
 
+## Contributing
+
+Issues and pull requests are welcome at [github.com/rossigee/provider-localai](https://github.com/rossigee/provider-localai).
+
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+provider-localai is under the Apache 2.0 license.
