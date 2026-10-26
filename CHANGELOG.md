@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its own CI and tests.
 - The `reviewable` target prints the advisories govulncheck found instead of
   only a count, and the `check-diff` job dumps the findings when it fails.
+- The Makefile's `GO_REQUIRED_VERSION` moves to 1.27.3, which is the version
+  the crossplane-providers audit expects.
 
 ## [0.1.13] - 2026-10-25
 
