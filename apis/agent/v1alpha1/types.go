@@ -59,6 +59,18 @@ type AgentParameters struct {
 	// +optional
 	ExcludedTools []string `json:"excludedTools,omitempty"`
 
+	// EnableKB turns on the knowledge base for this agent.
+	// +optional
+	EnableKB *bool `json:"enableKB,omitempty"`
+
+	// KbAsTools exposes the knowledge base as MCP tools.
+	// +optional
+	KbAsTools *bool `json:"kbAsTools,omitempty"`
+
+	// LongTermMemory enables long-term memory (notes) for this agent.
+	// +optional
+	LongTermMemory *bool `json:"longTermMemory,omitempty"`
+
 	// APIKeySecretRef references a Secret key holding the LocalAI API key the
 	// agent uses to call LocalAI's own API. Required when LocalAI has
 	// authentication enabled: LocalAI only generates a per-user agent key for

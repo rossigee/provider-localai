@@ -147,6 +147,15 @@ func agentUpToDate(cr *agentv1alpha1.Agent, a *laiclient.Agent) bool {
 	if p.EnableSkills != nil && (a.EnableSkills == nil || *a.EnableSkills != *p.EnableSkills) {
 		return false
 	}
+	if p.EnableKB != nil && (a.EnableKB == nil || *a.EnableKB != *p.EnableKB) {
+		return false
+	}
+	if p.KbAsTools != nil && (a.KbAsTools == nil || *a.KbAsTools != *p.KbAsTools) {
+		return false
+	}
+	if p.LongTermMemory != nil && (a.LongTermMemory == nil || *a.LongTermMemory != *p.LongTermMemory) {
+		return false
+	}
 	want := make([]laiclient.MCPServer, 0, len(p.MCPServers))
 	for _, s := range p.MCPServers {
 		want = append(want, laiclient.MCPServer{URL: s.URL, Token: s.Token})
@@ -183,6 +192,9 @@ func agentFromCR(cr *agentv1alpha1.Agent, apiKey string) laiclient.Agent {
 		SystemPrompt:   p.SystemPrompt,
 		SelectedSkills: p.Skills,
 		EnableSkills:   p.EnableSkills,
+		EnableKB:       p.EnableKB,
+		KbAsTools:      p.KbAsTools,
+		LongTermMemory: p.LongTermMemory,
 		AllowedTools:   p.AllowedTools,
 		ExcludedTools:  p.ExcludedTools,
 		APIKey:         apiKey,
@@ -207,7 +219,22 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*agentv1alpha1.Agent)
-	_, err := e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, agentFromCR(cr, e.apiKey))
+	desired := agentFromCR(cr, e.apiKey)
+	// Preserve KB/memory settings that are not managed by the CR. LocalAI
+	// treats omitted fields as "reset to default", so we fetch the current
+	// config and carry over any KB/memory values the CR does not set.
+	if current, err := e.client.GetAgent(ctx, cr.Spec.ForProvider.Name); err == nil && current != nil {
+		if desired.EnableKB == nil {
+			desired.EnableKB = current.EnableKB
+		}
+		if desired.KbAsTools == nil {
+			desired.KbAsTools = current.KbAsTools
+		}
+		if desired.LongTermMemory == nil {
+			desired.LongTermMemory = current.LongTermMemory
+		}
+	}
+	_, err := e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, desired)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
 	}
