@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: agents.agent.localai.crossplane.io
 spec:
   group: agent.localai.crossplane.io
@@ -88,6 +88,9 @@ spec:
                   description:
                     description: Description of the agent.
                     type: string
+                  enableKB:
+                    description: EnableKB turns on the knowledge base for this agent.
+                    type: boolean
                   enableSkills:
                     description: EnableSkills turns on the LocalAGI skills service
                       for this agent.
@@ -98,6 +101,13 @@ spec:
                     items:
                       type: string
                     type: array
+                  kbAsTools:
+                    description: KbAsTools exposes the knowledge base as MCP tools.
+                    type: boolean
+                  longTermMemory:
+                    description: LongTermMemory enables long-term memory (notes) for
+                      this agent.
+                    type: boolean
                   mcpServers:
                     description: |-
                       MCPServers is the per-agent MCP allowlist. Agents do not inherit
