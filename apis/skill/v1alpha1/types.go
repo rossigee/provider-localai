@@ -14,6 +14,10 @@ type SkillParameters struct {
 	// Description of the skill.
 	// +optional
 	Description string `json:"description,omitempty"`
+
+	// Content is the skill's instructions, sent to LocalAI as content.
+	// +kubebuilder:validation:Required
+	Content string `json:"content"`
 }
 
 // SkillObservation is the observed state.

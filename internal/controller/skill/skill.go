@@ -92,7 +92,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	cr.Status.AtProvider.Name = s.Name
 	cr.Status.SetConditions(xpv1.Available())
-	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+	upToDate := s.Content == cr.Spec.ForProvider.Content && s.Description == cr.Spec.ForProvider.Description
+	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: upToDate}, nil
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -100,6 +101,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	_, err := e.client.CreateSkill(ctx, laiclient.Skill{
 		Name:        cr.Spec.ForProvider.Name,
 		Description: cr.Spec.ForProvider.Description,
+		Content:     cr.Spec.ForProvider.Content,
 	})
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateSkill)
@@ -112,6 +114,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	_, err := e.client.UpdateSkill(ctx, cr.Spec.ForProvider.Name, laiclient.Skill{
 		Name:        cr.Spec.ForProvider.Name,
 		Description: cr.Spec.ForProvider.Description,
+		Content:     cr.Spec.ForProvider.Content,
 	})
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateSkill)
