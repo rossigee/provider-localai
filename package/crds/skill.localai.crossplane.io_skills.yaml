@@ -46,6 +46,10 @@ spec:
                 description: SkillParameters define the desired state of a LocalAI
                   Skill.
                 properties:
+                  content:
+                    description: Content is the skill's instructions, sent to LocalAI
+                      as content.
+                    type: string
                   description:
                     description: Description of the skill.
                     type: string
@@ -53,6 +57,7 @@ spec:
                     description: Name of the skill in LocalAI.
                     type: string
                 required:
+                - content
                 - name
                 type: object
               managementPolicies:
