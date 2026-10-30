@@ -13,7 +13,7 @@ models and settings.
 
 ## Container Registry
 
-- **Primary**: `ghcr.io/rossigee/provider-localai:v0.1.14`
+- **Primary**: `ghcr.io/rossigee/provider-localai:v0.1.18`
 
 ## Features
 
@@ -36,7 +36,7 @@ models and settings.
 ### Installation
 
 ```bash
-kubectl crossplane install provider ghcr.io/rossigee/provider-localai:v0.1.14
+kubectl crossplane install provider ghcr.io/rossigee/provider-localai:v0.1.18
 ```
 
 ### Configuration
