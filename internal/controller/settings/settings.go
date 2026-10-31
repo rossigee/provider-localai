@@ -12,28 +12,28 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	settingsv1alpha1 "github.com/rossigee/provider-localai/apis/settings/v1alpha1"
+	settingsv1beta1 "github.com/rossigee/provider-localai/apis/settings/v1beta1"
 )
 
 const (
 	errNotSettings = "managed resource is not a Settings"
-	controllerName = "settings.settings.localai.crossplane.io"
+	controllerName = "settings.settings.localai.m.crossplane.io"
 )
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(settingsv1alpha1.SchemeGroupVersion.WithKind("Settings")),
+		resource.ManagedKind(settingsv1beta1.SchemeGroupVersion.WithKind("Settings")),
 		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
 		managed.WithLogger(o.Logger.WithValues("controller", "Settings")),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
 	)
-	return ctrl.NewControllerManagedBy(mgr).Named(controllerName).WithOptions(o.ForControllerRuntime()).For(&settingsv1alpha1.Settings{}).Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).Named(controllerName).WithOptions(o.ForControllerRuntime()).For(&settingsv1beta1.Settings{}).Complete(r)
 }
 
 type connector struct{ kube client.Client }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	if _, ok := mg.(*settingsv1alpha1.Settings); !ok {
+	if _, ok := mg.(*settingsv1beta1.Settings); !ok {
 		return nil, errors.New(errNotSettings)
 	}
 	return &external{}, nil
@@ -43,7 +43,7 @@ type external struct{}
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	if cr, ok := mg.(*settingsv1alpha1.Settings); ok {
+	if cr, ok := mg.(*settingsv1beta1.Settings); ok {
 		cr.Status.SetConditions(xpv1.Available())
 	}
 	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil

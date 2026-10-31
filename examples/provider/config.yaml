@@ -8,7 +8,7 @@ stringData:
   # LocalAI only accepts API keys, not OIDC access tokens.
   token: "<LOCALAI_API_KEY>"
 ---
-apiVersion: localai.crossplane.io/v1beta1
+apiVersion: localai.m.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:
   name: localai

@@ -29,6 +29,6 @@ limitations under the License.
 // types from crossplane/crossplane/apis/v2.
 // Note: We specify explicit paths to avoid controller-gen trying to generate
 // CRDs for ProviderConfigUsage in each API group package.
-//go:generate go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen crd:crdVersions=v1 paths=./v1beta1 paths=./agent/v1alpha1 paths=./skill/v1alpha1 paths=./model/v1alpha1 paths=./settings/v1alpha1 output:artifacts:config=../package/crds
+//go:generate go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen crd:crdVersions=v1 paths=./v1beta1 paths=./agent/v1beta1 paths=./skill/v1beta1 paths=./model/v1beta1 paths=./settings/v1beta1 output:artifacts:config=../package/crds
 
 package apis

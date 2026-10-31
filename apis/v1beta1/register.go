@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	SchemeGroupVersion = schema.GroupVersion{Group: "localai.crossplane.io", Version: "v1beta1"}
+	SchemeGroupVersion = schema.GroupVersion{Group: "localai.m.crossplane.io", Version: "v1beta1"}
 	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme        = SchemeBuilder.AddToScheme
 )

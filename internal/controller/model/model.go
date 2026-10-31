@@ -14,7 +14,7 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	laiclient "github.com/rossigee/localai-client/client"
-	modelv1alpha1 "github.com/rossigee/provider-localai/apis/model/v1alpha1"
+	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
 	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
 )
@@ -22,10 +22,10 @@ import (
 const (
 	errNotModel    = "managed resource is not a Model"
 	errGetModel    = "cannot list LocalAI models"
-	controllerName = "models.model.localai.crossplane.io"
+	controllerName = "models.model.localai.m.crossplane.io"
 )
 
-func getProviderConfig(ctx context.Context, kube client.Client, cr *modelv1alpha1.Model) (*v1beta1.ProviderConfig, error) {
+func getProviderConfig(ctx context.Context, kube client.Client, cr *modelv1beta1.Model) (*v1beta1.ProviderConfig, error) {
 	pcName := cr.GetProviderConfigReference().Name
 	pc := &v1beta1.ProviderConfig{}
 	if err := kube.Get(ctx, client.ObjectKey{Name: pcName, Namespace: "crossplane-system"}, pc); err != nil {
@@ -36,18 +36,18 @@ func getProviderConfig(ctx context.Context, kube client.Client, cr *modelv1alpha
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(modelv1alpha1.SchemeGroupVersion.WithKind("Model")),
+		resource.ManagedKind(modelv1beta1.SchemeGroupVersion.WithKind("Model")),
 		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
 		managed.WithLogger(o.Logger.WithValues("controller", "Model")),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
 	)
-	return ctrl.NewControllerManagedBy(mgr).Named(controllerName).WithOptions(o.ForControllerRuntime()).For(&modelv1alpha1.Model{}).Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).Named(controllerName).WithOptions(o.ForControllerRuntime()).For(&modelv1beta1.Model{}).Complete(r)
 }
 
 type connector struct{ kube client.Client }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*modelv1alpha1.Model)
+	cr, ok := mg.(*modelv1beta1.Model)
 	if !ok {
 		return nil, errors.New(errNotModel)
 	}
@@ -74,7 +74,7 @@ type external struct{ client *laiclient.Client }
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr := mg.(*modelv1alpha1.Model)
+	cr := mg.(*modelv1beta1.Model)
 	models, err := e.client.ListModels(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetModel)

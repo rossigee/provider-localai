@@ -1,4 +1,4 @@
-package v1alpha1
+package v1beta1
 
 import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
@@ -24,7 +24,7 @@ type SettingsStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,localai}
+// +kubebuilder:resource:scope=Namespaced,categories={crossplane,managed,localai}
 type Settings struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

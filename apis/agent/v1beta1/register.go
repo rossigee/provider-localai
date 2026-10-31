@@ -1,4 +1,4 @@
-package v1alpha1
+package v1beta1
 
 import (
 	"reflect"
@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	Group   = "agent.localai.crossplane.io"
+	Group   = "agent.localai.m.crossplane.io"
 	Version = "v1alpha1"
 )
 

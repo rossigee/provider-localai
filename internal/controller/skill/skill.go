@@ -14,7 +14,7 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	laiclient "github.com/rossigee/localai-client/client"
-	skillv1alpha1 "github.com/rossigee/provider-localai/apis/skill/v1alpha1"
+	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
 	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
 )
@@ -26,10 +26,10 @@ const (
 	errUpdateSkill = "cannot update LocalAI skill"
 	errDeleteSkill = "cannot delete LocalAI skill"
 
-	controllerName = "skills.skill.localai.crossplane.io"
+	controllerName = "skills.skill.localai.m.crossplane.io"
 )
 
-func getProviderConfig(ctx context.Context, kube client.Client, cr *skillv1alpha1.Skill) (*v1beta1.ProviderConfig, error) {
+func getProviderConfig(ctx context.Context, kube client.Client, cr *skillv1beta1.Skill) (*v1beta1.ProviderConfig, error) {
 	pcName := cr.GetProviderConfigReference().Name
 	pc := &v1beta1.ProviderConfig{}
 	if err := kube.Get(ctx, client.ObjectKey{Name: pcName, Namespace: "crossplane-system"}, pc); err != nil {
@@ -40,7 +40,7 @@ func getProviderConfig(ctx context.Context, kube client.Client, cr *skillv1alpha
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(skillv1alpha1.SchemeGroupVersion.WithKind("Skill")),
+		resource.ManagedKind(skillv1beta1.SchemeGroupVersion.WithKind("Skill")),
 		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
 		managed.WithLogger(o.Logger.WithValues("controller", "Skill")),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
@@ -48,14 +48,14 @@ func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(controllerName).
 		WithOptions(o.ForControllerRuntime()).
-		For(&skillv1alpha1.Skill{}).
+		For(&skillv1beta1.Skill{}).
 		Complete(r)
 }
 
 type connector struct{ kube client.Client }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*skillv1alpha1.Skill)
+	cr, ok := mg.(*skillv1beta1.Skill)
 	if !ok {
 		return nil, errors.New(errNotSkill)
 	}
@@ -82,7 +82,7 @@ type external struct{ client *laiclient.Client }
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr := mg.(*skillv1alpha1.Skill)
+	cr := mg.(*skillv1beta1.Skill)
 	s, err := e.client.GetSkill(ctx, cr.Spec.ForProvider.Name)
 	if err != nil {
 		if laiclient.IsNotFound(err) {
@@ -97,7 +97,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr := mg.(*skillv1alpha1.Skill)
+	cr := mg.(*skillv1beta1.Skill)
 	_, err := e.client.CreateSkill(ctx, laiclient.Skill{
 		Name:        cr.Spec.ForProvider.Name,
 		Description: cr.Spec.ForProvider.Description,
@@ -110,7 +110,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr := mg.(*skillv1alpha1.Skill)
+	cr := mg.(*skillv1beta1.Skill)
 	_, err := e.client.UpdateSkill(ctx, cr.Spec.ForProvider.Name, laiclient.Skill{
 		Name:        cr.Spec.ForProvider.Name,
 		Description: cr.Spec.ForProvider.Description,
@@ -123,7 +123,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	cr := mg.(*skillv1alpha1.Skill)
+	cr := mg.(*skillv1beta1.Skill)
 	if err := e.client.DeleteSkill(ctx, cr.Spec.ForProvider.Name); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteSkill)
 	}

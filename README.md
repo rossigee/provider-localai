@@ -57,7 +57,7 @@ type: Opaque
 stringData:
   token: "<LOCALAI_API_KEY>"
 ---
-apiVersion: localai.crossplane.io/v1beta1
+apiVersion: localai.m.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:
   name: localai
@@ -83,7 +83,7 @@ tokens.
 ## Usage
 
 ```yaml
-apiVersion: agent.localai.crossplane.io/v1alpha1
+apiVersion: agent.localai.m.crossplane.io/v1beta1
 kind: Agent
 metadata:
   name: bookkeeping
@@ -136,11 +136,11 @@ LocalAI build that persists it gets it.
 
 | Resource | API Group | Description |
 |----------|-----------|-------------|
-| Agent | `agent.localai.crossplane.io/v1alpha1` | LocalAI agents, with model, system prompt, skills and MCP servers |
-| Skill | `skill.localai.crossplane.io/v1alpha1` | Skills available to agents |
-| Model | `model.localai.crossplane.io/v1alpha1` | Models available to the LocalAI deployment |
-| Settings | `settings.localai.crossplane.io/v1alpha1` | LocalAI instance settings |
-| ProviderConfig | `localai.crossplane.io/v1beta1` | LocalAI endpoint, API key and private CA |
+| Agent | `agent.localai.m.crossplane.io/v1beta1` | LocalAI agents, with model, system prompt, skills and MCP servers |
+| Skill | `skill.localai.m.crossplane.io/v1beta1` | Skills available to agents |
+| Model | `model.localai.m.crossplane.io/v1beta1` | Models available to the LocalAI deployment |
+| Settings | `settings.localai.m.crossplane.io/v1beta1` | LocalAI instance settings |
+| ProviderConfig | `localai.m.crossplane.io/v1beta1` | LocalAI endpoint, API key and private CA |
 
 ## Development
 
