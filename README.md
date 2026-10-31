@@ -96,7 +96,7 @@ spec:
       You keep the books. Use only the Odoo MCP tools.
     enableSkills: true
     skills:
-      - golder-bookkeeping
+      - example-bookkeeping
     mcpServers:
       - url: http://odoo-mcp.localai.svc.cluster.local:8080/stream
     apiKeySecretRef:
