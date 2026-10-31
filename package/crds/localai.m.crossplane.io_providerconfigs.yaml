@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.23.0
-  name: providerconfigs.localai.crossplane.io
+  name: providerconfigs.localai.m.crossplane.io
 spec:
-  group: localai.crossplane.io
+  group: localai.m.crossplane.io
   names:
     kind: ProviderConfig
     listKind: ProviderConfigList

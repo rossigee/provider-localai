@@ -4,21 +4,31 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.23.0
-  name: settings.settings.localai.crossplane.io
+  name: agents.agent.localai.m.crossplane.io
 spec:
-  group: settings.localai.crossplane.io
+  group: agent.localai.m.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - localai
-    kind: Settings
-    listKind: SettingsList
-    plural: settings
-    singular: settings
-  scope: Cluster
+    kind: Agent
+    listKind: AgentList
+    plural: agents
+    singular: agent
+  scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
     schema:
       openAPIV3Schema:
         properties:
@@ -40,11 +50,105 @@ spec:
           metadata:
             type: object
           spec:
+            description: AgentSpec defines the desired state of an Agent.
             properties:
               forProvider:
+                description: AgentParameters define the desired state of a LocalAI
+                  Agent.
                 properties:
-                  baseURL:
+                  allowedTools:
+                    description: AllowedTools, when set, is the only tool names offered
+                      to the model.
+                    items:
+                      type: string
+                    type: array
+                  apiKeySecretRef:
+                    description: |-
+                      APIKeySecretRef references a Secret key holding the LocalAI API key the
+                      agent uses to call LocalAI's own API. Required when LocalAI has
+                      authentication enabled: LocalAI only generates a per-user agent key for
+                      callers that have a row in the users table, and a provider authenticating
+                      with a static API key has none, so creation would otherwise fail with a
+                      user_api_keys foreign key violation.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  description:
+                    description: Description of the agent.
                     type: string
+                  enableKB:
+                    description: EnableKB turns on the knowledge base for this agent.
+                    type: boolean
+                  enableSkills:
+                    description: EnableSkills turns on the LocalAGI skills service
+                      for this agent.
+                    type: boolean
+                  excludedTools:
+                    description: ExcludedTools are never offered, even if also listed
+                      in AllowedTools.
+                    items:
+                      type: string
+                    type: array
+                  kbAsTools:
+                    description: KbAsTools exposes the knowledge base as MCP tools.
+                    type: boolean
+                  longTermMemory:
+                    description: LongTermMemory enables long-term memory (notes) for
+                      this agent.
+                    type: boolean
+                  mcpServers:
+                    description: |-
+                      MCPServers is the per-agent MCP allowlist. Agents do not inherit
+                      model-level mcp.remote from LocalAI model configs.
+                    items:
+                      description: MCPServerSpec is a remote MCP server the agent
+                        may use.
+                      properties:
+                        token:
+                          description: |-
+                            Token is an optional bearer token. Prefer proxy sidecars that inject
+                            tokens so this field stays empty in Git.
+                          type: string
+                        url:
+                          description: URL of the MCP Streamable HTTP / SSE endpoint.
+                          type: string
+                      required:
+                      - url
+                      type: object
+                    type: array
+                  model:
+                    description: Model to use for this agent.
+                    type: string
+                  name:
+                    description: Name of the agent in LocalAI.
+                    type: string
+                  skills:
+                    description: |-
+                      Skills is the list of skill names available to the agent. It is sent as
+                      selected_skills. LocalAI builds whose agent API has no selected_skills
+                      field drop it on write, which leaves every skill available, so it is not
+                      part of the drift comparison.
+                    items:
+                      type: string
+                    type: array
+                  systemPrompt:
+                    description: SystemPrompt is the system prompt for the agent.
+                    type: string
+                required:
+                - model
+                - name
                 type: object
               managementPolicies:
                 default:
@@ -105,8 +209,14 @@ spec:
             - forProvider
             type: object
           status:
+            description: AgentStatus defines the observed state of an Agent.
             properties:
               atProvider:
+                description: AgentObservation is the observed state of a LocalAI Agent.
+                properties:
+                  name:
+                    description: Name of the agent.
+                    type: string
                 type: object
               conditions:
                 description: Conditions of the resource.

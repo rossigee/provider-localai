@@ -1,4 +1,4 @@
-package v1alpha1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	Group   = "model.localai.crossplane.io"
+	Group   = "settings.localai.m.crossplane.io"
 	Version = "v1alpha1"
 )
 
@@ -18,7 +18,7 @@ var (
 )
 
 func addKnownTypes(s *runtime.Scheme) error {
-	s.AddKnownTypes(SchemeGroupVersion, &Model{}, &ModelList{})
+	s.AddKnownTypes(SchemeGroupVersion, &Settings{}, &SettingsList{})
 	metav1.AddToGroupVersion(s, SchemeGroupVersion)
 	return nil
 }

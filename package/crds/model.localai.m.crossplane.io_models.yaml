@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.23.0
-  name: models.model.localai.crossplane.io
+  name: models.model.localai.m.crossplane.io
 spec:
-  group: model.localai.crossplane.io
+  group: model.localai.m.crossplane.io
   names:
     categories:
     - crossplane
@@ -16,9 +16,9 @@ spec:
     listKind: ModelList
     plural: models
     singular: model
-  scope: Cluster
+  scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1beta1
     schema:
       openAPIV3Schema:
         properties:

@@ -1,20 +1,20 @@
 package apis
 
 import (
-	agentv1alpha1 "github.com/rossigee/provider-localai/apis/agent/v1alpha1"
-	modelv1alpha1 "github.com/rossigee/provider-localai/apis/model/v1alpha1"
-	settingsv1alpha1 "github.com/rossigee/provider-localai/apis/settings/v1alpha1"
-	skillv1alpha1 "github.com/rossigee/provider-localai/apis/skill/v1alpha1"
+	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
+	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
+	settingsv1beta1 "github.com/rossigee/provider-localai/apis/settings/v1beta1"
+	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
 	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func init() {
 	AddToSchemes = append(AddToSchemes,
-		agentv1alpha1.AddToScheme,
-		skillv1alpha1.AddToScheme,
-		modelv1alpha1.AddToScheme,
-		settingsv1alpha1.AddToScheme,
+		agentv1beta1.AddToScheme,
+		skillv1beta1.AddToScheme,
+		modelv1beta1.AddToScheme,
+		settingsv1beta1.AddToScheme,
 		v1beta1.AddToScheme,
 	)
 }

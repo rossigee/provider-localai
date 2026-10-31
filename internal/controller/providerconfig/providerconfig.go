@@ -15,7 +15,7 @@ import (
 	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 )
 
-const controllerName = "providerconfig.localai.crossplane.io"
+const controllerName = "providerconfig.localai.m.crossplane.io"
 
 // Setup registers the ProviderConfig controller.
 func Setup(mgr ctrl.Manager) error {

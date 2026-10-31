@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.23.0
-  name: skills.skill.localai.crossplane.io
+  name: skills.skill.localai.m.crossplane.io
 spec:
-  group: skill.localai.crossplane.io
+  group: skill.localai.m.crossplane.io
   names:
     categories:
     - crossplane
@@ -16,9 +16,9 @@ spec:
     listKind: SkillList
     plural: skills
     singular: skill
-  scope: Cluster
+  scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1beta1
     schema:
       openAPIV3Schema:
         properties:

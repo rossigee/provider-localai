@@ -15,7 +15,7 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	laiclient "github.com/rossigee/localai-client/client"
-	agentv1alpha1 "github.com/rossigee/provider-localai/apis/agent/v1alpha1"
+	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
 	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
 )
@@ -29,10 +29,10 @@ const (
 	errUpdateAgent       = "cannot update LocalAI agent"
 	errDeleteAgent       = "cannot delete LocalAI agent"
 
-	controllerName = "agents.agent.localai.crossplane.io"
+	controllerName = "agents.agent.localai.m.crossplane.io"
 )
 
-func getProviderConfig(ctx context.Context, kube client.Client, cr *agentv1alpha1.Agent) (*v1beta1.ProviderConfig, error) {
+func getProviderConfig(ctx context.Context, kube client.Client, cr *agentv1beta1.Agent) (*v1beta1.ProviderConfig, error) {
 	pcName := cr.GetProviderConfigReference().Name
 	pc := &v1beta1.ProviderConfig{}
 	if err := kube.Get(ctx, client.ObjectKey{Name: pcName, Namespace: "crossplane-system"}, pc); err != nil {
@@ -44,7 +44,7 @@ func getProviderConfig(ctx context.Context, kube client.Client, cr *agentv1alpha
 // Setup registers the Agent controller.
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(agentv1alpha1.SchemeGroupVersion.WithKind("Agent")),
+		resource.ManagedKind(agentv1beta1.SchemeGroupVersion.WithKind("Agent")),
 		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
 		managed.WithLogger(o.Logger.WithValues("controller", "Agent")),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
@@ -52,14 +52,14 @@ func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(controllerName).
 		WithOptions(o.ForControllerRuntime()).
-		For(&agentv1alpha1.Agent{}).
+		For(&agentv1beta1.Agent{}).
 		Complete(r)
 }
 
 type connector struct{ kube client.Client }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*agentv1alpha1.Agent)
+	cr, ok := mg.(*agentv1beta1.Agent)
 	if !ok {
 		return nil, errors.New(errNotAgent)
 	}
@@ -87,7 +87,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 }
 
 // resolveAgentAPIKey reads the key the agent uses to call LocalAI's own API.
-func resolveAgentAPIKey(ctx context.Context, kube client.Client, cr *agentv1alpha1.Agent) (string, error) {
+func resolveAgentAPIKey(ctx context.Context, kube client.Client, cr *agentv1beta1.Agent) (string, error) {
 	ref := cr.Spec.ForProvider.APIKeySecretRef
 	if ref == nil {
 		return "", nil
@@ -115,7 +115,7 @@ type external struct {
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr := mg.(*agentv1alpha1.Agent)
+	cr := mg.(*agentv1beta1.Agent)
 	a, err := e.client.GetAgent(ctx, cr.Spec.ForProvider.Name)
 	if err != nil {
 		if laiclient.IsNotFound(err) {
@@ -133,7 +133,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 // agentUpToDate compares the desired agent against what LocalAI reports, so
 // edits to any field are pushed rather than only model changes.
-func agentUpToDate(cr *agentv1alpha1.Agent, a *laiclient.Agent) bool {
+func agentUpToDate(cr *agentv1beta1.Agent, a *laiclient.Agent) bool {
 	p := cr.Spec.ForProvider
 	if a.Model != p.Model || a.Description != p.Description || a.SystemPrompt != p.SystemPrompt {
 		return false
@@ -183,7 +183,7 @@ func equalStrings(a, b []string) bool {
 	return true
 }
 
-func agentFromCR(cr *agentv1alpha1.Agent, apiKey string) laiclient.Agent {
+func agentFromCR(cr *agentv1beta1.Agent, apiKey string) laiclient.Agent {
 	p := cr.Spec.ForProvider
 	out := laiclient.Agent{
 		Name:           p.Name,
@@ -209,7 +209,7 @@ func agentFromCR(cr *agentv1alpha1.Agent, apiKey string) laiclient.Agent {
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr := mg.(*agentv1alpha1.Agent)
+	cr := mg.(*agentv1beta1.Agent)
 	_, err := e.client.CreateAgent(ctx, agentFromCR(cr, e.apiKey))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
@@ -218,7 +218,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr := mg.(*agentv1alpha1.Agent)
+	cr := mg.(*agentv1beta1.Agent)
 	desired := agentFromCR(cr, e.apiKey)
 	// Preserve KB/memory settings that are not managed by the CR. LocalAI
 	// treats omitted fields as "reset to default", so we fetch the current
@@ -242,7 +242,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	cr := mg.(*agentv1alpha1.Agent)
+	cr := mg.(*agentv1beta1.Agent)
 	if err := e.client.DeleteAgent(ctx, cr.Spec.ForProvider.Name); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteAgent)
 	}
