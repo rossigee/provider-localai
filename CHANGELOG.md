@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking
+
+- Agent, Model, Settings and Skill are now namespaced and served from
+  `<kind>.localai.m.crossplane.io/v1beta1`. They were cluster-scoped under
+  `*.localai.crossplane.io/v1alpha1`. ProviderConfig moved to
+  `localai.m.crossplane.io/v1beta1`. Orphan existing resources before removing
+  the old CRDs; see [docs/migration-namespaced-groups.md](docs/migration-namespaced-groups.md).
+
 ## [0.1.16] - 2026-10-26
 
 ### Changed
