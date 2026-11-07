@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-07
 
 ### Added
 
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `spec.forProvider.config` field carries the full model configuration as
   YAML; drift is detected by comparing the sha256 recorded in
   `status.atProvider.configHash`, since LocalAI has no endpoint that returns
-  a model's stored configuration. Requires `localai-client` v0.1.6.
+  a model's stored configuration. Requires `localai-client` v0.1.5.
 
 ### Breaking
 
