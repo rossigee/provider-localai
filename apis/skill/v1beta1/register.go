@@ -8,7 +8,7 @@ import (
 
 const (
 	Group   = "skill.localai.m.crossplane.io"
-	Version = "v1alpha1"
+	Version = "v1beta1"
 )
 
 var (
