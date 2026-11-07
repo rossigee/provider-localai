@@ -45,6 +45,15 @@ spec:
                 properties:
                   backend:
                     type: string
+                  config:
+                    description: |-
+                      Config is the full model configuration as YAML, in the shape LocalAI
+                      stores under /models (the HelmRelease modelsConfigs literals). It is
+                      written verbatim via POST /models/import; re-importing overwrites.
+                      When empty, LocalAI receives only name and backend. If the config
+                      carries its own name it must match Name; name and backend in the CR
+                      are authoritative.
+                    type: string
                   name:
                     type: string
                 required:
@@ -112,6 +121,12 @@ spec:
             properties:
               atProvider:
                 properties:
+                  configHash:
+                    description: |-
+                      ConfigHash is the sha256 of the canonical JSON of the configuration the
+                      provider last applied, used to detect spec drift because LocalAI has no
+                      endpoint that returns a model's stored configuration.
+                    type: string
                   name:
                     type: string
                 type: object

@@ -10,10 +10,22 @@ type ModelParameters struct {
 	Name string `json:"name"`
 	// +optional
 	Backend string `json:"backend,omitempty"`
+	// Config is the full model configuration as YAML, in the shape LocalAI
+	// stores under /models (the HelmRelease modelsConfigs literals). It is
+	// written verbatim via POST /models/import; re-importing overwrites.
+	// When empty, LocalAI receives only name and backend. If the config
+	// carries its own name it must match Name; name and backend in the CR
+	// are authoritative.
+	// +optional
+	Config string `json:"config,omitempty"`
 }
 
 type ModelObservation struct {
 	Name string `json:"name,omitempty"`
+	// ConfigHash is the sha256 of the canonical JSON of the configuration the
+	// provider last applied, used to detect spec drift because LocalAI has no
+	// endpoint that returns a model's stored configuration.
+	ConfigHash string `json:"configHash,omitempty"`
 }
 
 type ModelSpec struct {
