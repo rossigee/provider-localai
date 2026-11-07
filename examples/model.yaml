@@ -1,0 +1,26 @@
+apiVersion: model.localai.m.crossplane.io/v1beta1
+kind: Model
+metadata:
+  name: zen-qwen3.8-flash
+  namespace: crossplane-system
+spec:
+  forProvider:
+    name: zen-qwen3.8-flash
+    backend: localai-proxy
+    # Full model configuration as YAML, in the shape LocalAI stores under
+    # /models. Written via POST /models/import; re-importing overwrites.
+    config: |
+      name: zen-qwen3.8-flash
+      backend: localai-proxy
+      parameters:
+        model: qwen3.8-flash
+      proxy:
+        upstream_url: https://opencode.ai/inference/openai
+        upstream_model: qwen3.8-flash
+        api_key_env: OPENCODE_API_KEY
+      known_usecases:
+        - chat
+      capabilities:
+        - chat
+  providerConfigRef:
+    name: localai-provider-config

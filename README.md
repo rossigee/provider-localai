@@ -132,6 +132,26 @@ LocalAI build that persists it gets it.
 - The whole desired agent (model, description, system prompt, tools, MCP
   servers) is compared, so edits converge instead of being ignored.
 
+### Model
+
+- `Create`/`Update` POST the configuration to `/models/import`, which writes
+  `/models/<name>.yaml`. Re-importing overwrites, so both operations are the
+  same call; both are synchronous unless the config references downloads
+  (`download_files`, URI-valued `model`/`mmproj`), in which case LocalAI
+  queues a gallery job and `Observe` reports existence once it lands.
+- `Delete` posts to `/models/delete/{name}` and returns immediately; the
+  model leaves the list from `/v1/models` when the job completes, which
+  `Observe` sees.
+- There is no endpoint that returns a model's stored configuration, so drift
+  detection compares the spec: the sha256 of the canonical desired config is
+  recorded in `status.atProvider.configHash`. The first observation of an
+  already-existing model adopts the desired hash as the baseline without
+  rewriting the external config; later spec edits surface as
+  `ResourceUpToDate=false` and converge via `Update`.
+- `spec.forProvider.config` is the full model configuration as YAML (the
+  shape LocalAI stores). The CR `name` and `backend` are authoritative:
+  a config whose name or backend disagrees is rejected.
+
 ## Resource Types
 
 | Resource | API Group | Description |

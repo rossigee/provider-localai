@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The Model controller manages models: `Create`/`Update` write the
+  configuration through `POST /models/import` (re-importing overwrites) and
+  `Delete` posts to `/models/delete/{name}`. The new
+  `spec.forProvider.config` field carries the full model configuration as
+  YAML; drift is detected by comparing the sha256 recorded in
+  `status.atProvider.configHash`, since LocalAI has no endpoint that returns
+  a model's stored configuration. Requires `localai-client` v0.1.6.
+
 ### Breaking
 
 - Agent, Model, Settings and Skill are now namespaced and served from
