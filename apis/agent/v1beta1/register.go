@@ -10,7 +10,7 @@ import (
 
 const (
 	Group   = "agent.localai.m.crossplane.io"
-	Version = "v1alpha1"
+	Version = "v1beta1"
 )
 
 var (
