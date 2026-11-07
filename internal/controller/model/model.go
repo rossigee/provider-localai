@@ -1,10 +1,15 @@
 package model
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"strings"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
@@ -35,6 +40,13 @@ const (
 
 	controllerName = "models.model.localai.m.crossplane.io"
 )
+
+// ImportModelResponse is the response envelope from POST /models/import.
+type ImportModelResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	UUID    string `json:"uuid,omitempty"`
+}
 
 func getProviderConfig(ctx context.Context, kube client.Client, cr *modelv1beta1.Model) (*v1beta1.ProviderConfig, error) {
 	pcName := cr.GetProviderConfigReference().Name
@@ -77,7 +89,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI client")
 	}
-	return &external{client: laic}, nil
+	return &external{client: laic, cfg: cfg}, nil
 }
 
 // desiredModelConfig renders the configuration to POST to /models/import. The
@@ -123,7 +135,10 @@ func modelConfigHash(cfg map[string]any) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-type external struct{ client *laiclient.Client }
+type external struct {
+	client *laiclient.Client
+	cfg    laiclient.Config
+}
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
@@ -169,8 +184,8 @@ func (e *external) importModel(ctx context.Context, cr *modelv1beta1.Model) erro
 	if err != nil {
 		return errors.Wrap(err, errParseConfig)
 	}
-	res, err := e.client.ImportModel(ctx, desired)
-	if err != nil {
+	var res ImportModelResponse
+	if err := e.do(ctx, http.MethodPost, "/models/import", desired, &res); err != nil {
 		return err
 	}
 	if !res.Success && res.UUID == "" {
@@ -181,6 +196,52 @@ func (e *external) importModel(ctx context.Context, cr *modelv1beta1.Model) erro
 		return err
 	}
 	cr.Status.AtProvider.ConfigHash = hash
+	return nil
+}
+
+// do makes an authenticated JSON request to the LocalAI API. It mirrors the
+// unexported Client.do method on laiclient.Client, which is not accessible
+// from this package because localai-client v0.1.5 does not export ImportModel
+// or DeleteModel for models.
+func (e *external) do(ctx context.Context, method, path string, body, out any) error {
+	var r io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return errors.Wrap(err, "cannot encode request body")
+		}
+		r = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, e.cfg.BaseURL+path, r)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if e.cfg.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+e.cfg.APIKey)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	raw, err := io.ReadAll(resp.Body)
+	closeErr := resp.Body.Close()
+	if err != nil {
+		return errors.Wrap(err, "cannot read response")
+	}
+	if closeErr != nil {
+		return errors.Wrap(closeErr, "cannot close response body")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &laiclient.APIError{Method: method, Path: path, StatusCode: resp.StatusCode, Body: string(raw)}
+	}
+	if out != nil && len(raw) > 0 {
+		if err := json.Unmarshal(raw, out); err != nil {
+			return fmt.Errorf("decode: %w: %s", err, string(raw))
+		}
+	}
 	return nil
 }
 
@@ -206,7 +267,8 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr := mg.(*modelv1beta1.Model)
 	// Deletion is asynchronous: LocalAI returns a job envelope and the model
 	// leaves the list from /v1/models once it completes, which Observe sees.
-	if _, err := e.client.DeleteModel(ctx, cr.Spec.ForProvider.Name); err != nil {
+	path := "/models/delete/" + url.PathEscape(cr.Spec.ForProvider.Name)
+	if err := e.do(ctx, http.MethodPost, path, nil, nil); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteModel)
 	}
 	return managed.ExternalDelete{}, nil

@@ -24,7 +24,7 @@ func testExternal(t *testing.T, h http.HandlerFunc) (*external, *httptest.Server
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	return &external{client: c}, srv
+	return &external{client: c, cfg: laiclient.Config{BaseURL: srv.URL, APIKey: "test-key"}}, srv
 }
 
 func newModelCR(name string) *modelv1beta1.Model {
