@@ -89,7 +89,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI client")
 	}
-	return &external{client: laic, cfg: cfg}, nil
+	rawClient, err := clients.NewLocalAIHTTPClient(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot build LocalAI HTTP client")
+	}
+	return &external{client: laic, cfg: cfg, httpClient: rawClient}, nil
 }
 
 // desiredModelConfig renders the configuration to POST to /models/import. The
@@ -136,8 +140,9 @@ func modelConfigHash(cfg map[string]any) (string, error) {
 }
 
 type external struct {
-	client *laiclient.Client
-	cfg    laiclient.Config
+	client     *laiclient.Client
+	cfg        laiclient.Config
+	httpClient *http.Client
 }
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
@@ -222,7 +227,7 @@ func (e *external) do(ctx context.Context, method, path string, body, out any) e
 	if e.cfg.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+e.cfg.APIKey)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := e.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
