@@ -2,6 +2,9 @@ package clients
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"net/http"
 	"strings"
 
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
@@ -10,9 +13,50 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
+
 	laiclient "github.com/rossigee/localai-client/client"
 	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 )
+
+// NewLocalAIHTTPClient builds an HTTP client for raw (non-snapshot) LocalAI
+// API calls with the same auth and CA settings laiclient.New uses: API-key or
+// OAuth2 client-credentials auth, the system CA pool plus the configured
+// RootCACertificate, and MinVersion TLS 1.2. Certificate verification is never
+// skipped. It exists because the model
+// controller's raw-HTTP helpers need a transport that the laiclient.Client
+// does not expose.
+func NewLocalAIHTTPClient(ctx context.Context, cfg laiclient.Config) (*http.Client, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	if cfg.RootCACertificate != "" {
+		pool, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot load system CA pool")
+		}
+		if !pool.AppendCertsFromPEM([]byte(cfg.RootCACertificate)) {
+			return nil, errors.New("rootCACertificate contains no valid PEM certificates")
+		}
+		tlsConfig.RootCAs = pool
+	}
+	base := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
+
+	switch {
+	case cfg.APIKey != "":
+		return base, nil
+	case cfg.TokenURL != "" && cfg.ClientID != "" && cfg.ClientSecret != "":
+		oauth2Cfg := clientcredentials.Config{
+			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, TokenURL: cfg.TokenURL,
+		}
+		return oauth2Cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, base)), nil
+	}
+	return nil, errors.New("either an API key or tokenURL/clientID/clientSecret must be configured")
+}
 
 // GetLocalAIConfig resolves a ProviderConfig into a laiclient.Config.
 //
