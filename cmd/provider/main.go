@@ -29,6 +29,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 	"github.com/rossigee/provider-localai/apis"
+	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
+	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
+	settingsv1beta1 "github.com/rossigee/provider-localai/apis/settings/v1beta1"
+	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
 	controller "github.com/rossigee/provider-localai/internal/controller"
 	"github.com/rossigee/provider-localai/internal/version"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -130,7 +134,12 @@ func (o *options) controllerOptions(log logging.Logger, mrStateMetrics *statemet
 // stateManagedLists returns every resource whose poll state is recorded as a
 // metric. Kept as data so the set can be asserted rather than counted by eye.
 func stateManagedLists() []resource.ManagedList {
-	return nil
+	return []resource.ManagedList{
+		&agentv1beta1.AgentList{},
+		&modelv1beta1.ModelList{},
+		&skillv1beta1.SkillList{},
+		&settingsv1beta1.SettingsList{},
+	}
 }
 
 func main() {

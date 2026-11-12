@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `internal/tracing` package, which nothing imported, is removed. Its
+  direct OpenTelemetry dependencies are gone from `go.mod`.
+- State metrics are recorded for Agent, Model, Skill and Settings. The
+  `--poll-state-metric` flag was parsed, but no resource kinds were listed, so
+  nothing was recorded.
+
 ## [0.3.1] - 2026-11-13
 
 ### Breaking

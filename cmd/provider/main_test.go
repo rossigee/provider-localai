@@ -209,3 +209,15 @@ func contextWithTimeout(d time.Duration) (context.Context, context.CancelFunc) {
 func asExitError(err error, target **exec.ExitError) bool {
 	return errors.As(err, target)
 }
+
+func TestStateManagedListsCoverEveryManagedKind(t *testing.T) {
+	lists := stateManagedLists()
+	if len(lists) != 4 {
+		t.Fatalf("stateManagedLists() returned %d lists, want 4 (Agent, Model, Skill, Settings)", len(lists))
+	}
+	for _, l := range lists {
+		if l.GetItems() == nil {
+			t.Errorf("%T.GetItems() returned nil, want a slice", l)
+		}
+	}
+}
