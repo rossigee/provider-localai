@@ -106,8 +106,15 @@ jobs:
         run: |
           cp go.mod go.mod.bak && cp go.sum go.sum.bak
           GOWORK=$(mktemp -d)/go.work && echo "go 1.24" > $GOWORK && GOWORK=$GOWORK go install golang.org/x/vuln/cmd/govulncheck@v1.5.0 || { GOWORK_DIR=$(dirname $GOWORK); rm -f $GOWORK 2>/dev/null; rmdir $GOWORK_DIR 2>/dev/null; mv go.mod.bak go.mod 2>/dev/null; mv go.sum.bak go.sum 2>/dev/null; exit 1; }
-          (GOFLAGS=-mod=mod GOWORK=$GOWORK go run -mod=mod golang.org/x/vuln/cmd/govulncheck ./... 2>&1 || true) | tee /tmp/govulncheck.out >/dev/null
+          set +e
+          "$(go env GOPATH)/bin/govulncheck" ./... > /tmp/govulncheck.out 2>&1
+          VULN_RC=$?
+          set -e
           mv go.mod.bak go.mod && mv go.sum.bak go.sum
+          # govulncheck exits 3 when it reports vulnerabilities; any other non-zero exit is a scanner failure.
+          if [ "$VULN_RC" -ne 0 ] && [ "$VULN_RC" -ne 3 ]; then
+            echo "govulncheck failed with exit code $VULN_RC"; cat /tmp/govulncheck.out; rm -f /tmp/govulncheck.out; exit "$VULN_RC"
+          fi
           if grep -q "^Vulnerability #" /tmp/govulncheck.out; then
             FIXED=$(grep -c "Fixed in: N/A" /tmp/govulncheck.out || true)
             TOTAL=$(grep -c "^Vulnerability #" /tmp/govulncheck.out || true)

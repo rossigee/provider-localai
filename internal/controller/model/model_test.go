@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,6 +141,81 @@ func TestCreateAcceptsQueuedJobEnvelope(t *testing.T) {
 	cr := newModelCR("zen-qwen3.8-flash")
 	if _, err := e.Create(context.Background(), cr); err != nil {
 		t.Fatalf("Create: %v", err)
+	}
+}
+
+func TestCreateRecordsPendingImportJob(t *testing.T) {
+	e, _ := testExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"uuid":"job-9","status":"queued"}`)
+	})
+	cr := newModelCR("zen-qwen3.8-flash")
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if cr.Status.AtProvider.PendingImportUUID != "job-9" {
+		t.Errorf("PendingImportUUID = %q, want job-9", cr.Status.AtProvider.PendingImportUUID)
+	}
+	if _, err := time.Parse(time.RFC3339, cr.Status.AtProvider.PendingImportSince); err != nil {
+		t.Errorf("PendingImportSince = %q is not RFC 3339: %v", cr.Status.AtProvider.PendingImportSince, err)
+	}
+}
+
+func TestObserveWaitsForPendingImport(t *testing.T) {
+	e, _ := testExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"object":"list","data":[]}`)
+	})
+	cr := newModelCR("zen-qwen3.8-flash")
+	cr.Status.AtProvider.PendingImportUUID = "job-9"
+	cr.Status.AtProvider.PendingImportSince = time.Now().UTC().Format(time.RFC3339)
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceExists || !obs.ResourceUpToDate {
+		t.Errorf("observation = %+v, want exists and up to date while the import is pending", obs)
+	}
+	if cr.Status.AtProvider.PendingImportUUID != "job-9" {
+		t.Error("pending import was cleared before the model appeared")
+	}
+}
+
+func TestObserveRetriesExpiredPendingImport(t *testing.T) {
+	e, _ := testExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"object":"list","data":[]}`)
+	})
+	cr := newModelCR("zen-qwen3.8-flash")
+	cr.Status.AtProvider.PendingImportUUID = "job-9"
+	cr.Status.AtProvider.PendingImportSince = time.Now().Add(-pendingImportTimeout - time.Minute).UTC().Format(time.RFC3339)
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if obs.ResourceExists {
+		t.Error("ResourceExists = true after the pending import timed out, want false so Create resubmits")
+	}
+	if cr.Status.AtProvider.PendingImportUUID != "" || cr.Status.AtProvider.PendingImportSince != "" {
+		t.Error("expired pending import was not cleared")
+	}
+}
+
+func TestObserveClearsPendingImportWhenModelListed(t *testing.T) {
+	e, _ := testExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"object":"list","data":[{"id":"zen-qwen3.8-flash","object":"model"}]}`)
+	})
+	cr := newModelCR("zen-qwen3.8-flash")
+	cr.Status.AtProvider.PendingImportUUID = "job-9"
+	cr.Status.AtProvider.PendingImportSince = time.Now().UTC().Format(time.RFC3339)
+	if _, err := e.Observe(context.Background(), cr); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if cr.Status.AtProvider.PendingImportUUID != "" {
+		t.Error("pending import was not cleared once the model was listed")
+	}
+}
+
+func TestPendingImportExpiredTreatsBadTimestampAsExpired(t *testing.T) {
+	if !pendingImportExpired("not-a-time", time.Now()) {
+		t.Error("unparseable timestamp should count as expired")
 	}
 }
 

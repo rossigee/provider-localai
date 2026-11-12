@@ -61,6 +61,7 @@ apiVersion: localai.m.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:
   name: localai
+  namespace: crossplane-system
 spec:
   baseURL: https://localai.example.com
   credentials:
@@ -80,6 +81,19 @@ spec:
 Use them only when LocalAI sits behind something that accepts OAuth2 bearer
 tokens.
 
+### Namespaces
+
+Agent, Model, Skill and Settings resolve `spec.providerConfigRef.name` to a
+ProviderConfig in their own namespace. A resource therefore needs a
+ProviderConfig beside it; the provider does not fall back to
+`crossplane-system`.
+
+Every Secret a ProviderConfig references (`credentials.secretRef`,
+`rootCACertificateRef`, `clientSecretRef`) must be in the ProviderConfig's
+namespace. An Agent's `apiKeySecretRef` must be in the Agent's namespace. A
+reference to any other namespace is rejected, so a tenant cannot make the
+provider read a Secret it could not read itself.
+
 ## Usage
 
 ```yaml
@@ -87,6 +101,7 @@ apiVersion: agent.localai.m.crossplane.io/v1beta1
 kind: Agent
 metadata:
   name: bookkeeping
+  namespace: crossplane-system
 spec:
   forProvider:
     name: bookkeeping
@@ -138,7 +153,11 @@ LocalAI build that persists it gets it.
   `/models/<name>.yaml`. Re-importing overwrites, so both operations are the
   same call; both are synchronous unless the config references downloads
   (`download_files`, URI-valued `model`/`mmproj`), in which case LocalAI
-  queues a gallery job and `Observe` reports existence once it lands.
+  queues a gallery job and `Observe` reports existence once it lands. The job
+  ID is kept in `status.atProvider.pendingImportUUID`. While the model is not
+  yet listed, `Observe` reports it as existing and current rather than posting
+  the import again. If it has not appeared after 10 minutes, the import is
+  treated as failed and submitted again.
 - `Delete` posts to `/models/delete/{name}` and returns immediately; the
   model leaves the list from `/v1/models` when the job completes, which
   `Observe` sees.

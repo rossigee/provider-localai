@@ -23,4 +23,4 @@ spec:
       capabilities:
         - chat
   providerConfigRef:
-    name: localai-provider-config
+    name: localai
