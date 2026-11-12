@@ -94,6 +94,18 @@ namespace. An Agent's `apiKeySecretRef` must be in the Agent's namespace. A
 reference to any other namespace is rejected, so a tenant cannot make the
 provider read a Secret it could not read itself.
 
+### Adoption and deletion
+
+An Agent, Model or Skill that finds an object of the same name already in
+LocalAI on first observation adopts it. The resource then updates the object
+to match its spec, as before. Deleting an adopted resource leaves the LocalAI
+object in place, so a resource cannot remove something it did not create. The
+resource records this in `status.atProvider.ownership`: `created` when this
+provider created the object, `adopted` when it was found already present.
+
+Resources that predate this field have no `ownership` value and are deleted
+with the object, as before.
+
 ## Usage
 
 ```yaml

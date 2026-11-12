@@ -243,6 +243,12 @@ spec:
                   name:
                     description: Name of the agent.
                     type: string
+                  ownership:
+                    description: |-
+                      Ownership is "created" when this provider created the agent in LocalAI,
+                      or "adopted" when it was already there on first observation. Deleting the
+                      resource deletes the agent only when it is not adopted.
+                    type: string
                 type: object
               conditions:
                 description: Conditions of the resource.

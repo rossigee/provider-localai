@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `status.atProvider.credentialsHash`. Rotating a referenced Secret updates the
   agent. MCP token values are no longer compared with LocalAI.
 
+- Agents, Models and Skills record `status.atProvider.ownership`. An object
+  that was already in LocalAI when the resource first observed it is adopted,
+  and deleting the resource leaves it in place. Objects created by the provider
+  are deleted as before. Resources from before this change keep their current
+  delete behaviour.
+
 ### Fixed
 
 - A Model whose import is still queued in LocalAI is no longer re-posted on

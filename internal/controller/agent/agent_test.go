@@ -16,6 +16,7 @@ import (
 
 	laiclient "github.com/rossigee/localai-client/client"
 	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
+	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 func testKube(t *testing.T, objs ...client.Object) client.Client {
@@ -179,5 +180,64 @@ func TestResolveCredentialsRejectsCrossNamespaceMCPToken(t *testing.T) {
 	_, err := resolveCredentials(context.Background(), testKube(t), cr)
 	if err == nil || !strings.Contains(err.Error(), "Agent's namespace") {
 		t.Fatalf("expected cross-namespace rejection, got %v", err)
+	}
+}
+
+// deleteRequests returns how many non-GET requests reach LocalAI when the
+// agent is deleted with the given ownership.
+func deleteRequests(t *testing.T, ownership string) int {
+	t.Helper()
+	var writes int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writes++
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.Name = "bookkeeping"
+	cr.Status.AtProvider.Ownership = ownership
+	if _, err := (&external{client: c}).Delete(context.Background(), cr); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	return writes
+}
+
+func TestDeleteKeepsAdoptedAgent(t *testing.T) {
+	if n := deleteRequests(t, clients.OwnershipAdopted); n != 0 {
+		t.Errorf("Delete sent %d write request(s) for an adopted agent, want 0", n)
+	}
+}
+
+func TestDeleteRemovesCreatedAndLegacyAgents(t *testing.T) {
+	for _, o := range []string{clients.OwnershipCreated, ""} {
+		if n := deleteRequests(t, o); n == 0 {
+			t.Errorf("Delete with ownership %q sent no request, want the agent removed", o)
+		}
+	}
+}
+
+func TestObserveMarksPreExistingAgentAdopted(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"name":"bookkeeping","model":"qwen3-8b"}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.Name = "bookkeeping"
+	cr.Spec.ForProvider.Model = "qwen3-8b"
+	if _, err := (&external{client: c}).Observe(context.Background(), cr); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if cr.Status.AtProvider.Ownership != clients.OwnershipAdopted {
+		t.Errorf("ownership = %q, want adopted", cr.Status.AtProvider.Ownership)
 	}
 }

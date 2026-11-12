@@ -83,6 +83,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetSkill)
 	}
+	clients.RecordFirstObservation(&cr.Status.AtProvider.Ownership, cr.Status.AtProvider.Name)
 	cr.Status.AtProvider.Name = s.Name
 	cr.Status.SetConditions(xpv1.Available())
 	upToDate := s.Content == cr.Spec.ForProvider.Content && s.Description == cr.Spec.ForProvider.Description
@@ -99,6 +100,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateSkill)
 	}
+	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
 	return managed.ExternalCreation{}, nil
 }
 
@@ -117,6 +119,10 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr := mg.(*skillv1beta1.Skill)
+	if !clients.DeletesExternal(cr.Status.AtProvider.Ownership) {
+		// The skill was already in LocalAI and is not ours to remove.
+		return managed.ExternalDelete{}, nil
+	}
 	if err := e.client.DeleteSkill(ctx, cr.Spec.ForProvider.Name); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteSkill)
 	}

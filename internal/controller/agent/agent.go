@@ -165,6 +165,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetAgent)
 	}
+	clients.RecordFirstObservation(&cr.Status.AtProvider.Ownership, cr.Status.AtProvider.Name)
 	cr.Status.AtProvider.Name = a.Name
 	cr.Status.SetConditions(xpv1.Available())
 
@@ -263,6 +264,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
 	}
 	cr.Status.AtProvider.CredentialsHash = e.creds.hash()
+	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
 	return managed.ExternalCreation{}, nil
 }
 
@@ -298,6 +300,10 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr := mg.(*agentv1beta1.Agent)
+	if !clients.DeletesExternal(cr.Status.AtProvider.Ownership) {
+		// The agent was already in LocalAI and is not ours to remove.
+		return managed.ExternalDelete{}, nil
+	}
 	if err := e.client.DeleteAgent(ctx, cr.Spec.ForProvider.Name); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteAgent)
 	}

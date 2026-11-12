@@ -163,6 +163,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		if m.Name == cr.Spec.ForProvider.Name {
 			cr.Status.AtProvider.PendingImportUUID = ""
 			cr.Status.AtProvider.PendingImportSince = ""
+			clients.RecordFirstObservation(&cr.Status.AtProvider.Ownership, cr.Status.AtProvider.Name)
 			cr.Status.AtProvider.Name = m.Name
 			cr.Status.SetConditions(xpv1.Available())
 			observed := cr.Status.AtProvider.ConfigHash
@@ -282,6 +283,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateModel)
 	}
 	cr.Status.AtProvider.Name = cr.Spec.ForProvider.Name
+	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
 	return managed.ExternalCreation{}, nil
 }
 
@@ -296,6 +298,10 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr := mg.(*modelv1beta1.Model)
+	if !clients.DeletesExternal(cr.Status.AtProvider.Ownership) {
+		// The model was already in LocalAI and is not ours to remove.
+		return managed.ExternalDelete{}, nil
+	}
 	// Deletion is asynchronous: LocalAI returns a job envelope and the model
 	// leaves the list from /v1/models once it completes, which Observe sees.
 	path := "/models/delete/" + url.PathEscape(cr.Spec.ForProvider.Name)

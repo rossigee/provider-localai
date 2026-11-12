@@ -93,6 +93,11 @@ type AgentObservation struct {
 	// Name of the agent.
 	Name string `json:"name,omitempty"`
 
+	// Ownership is "created" when this provider created the agent in LocalAI,
+	// or "adopted" when it was already there on first observation. Deleting the
+	// resource deletes the agent only when it is not adopted.
+	Ownership string `json:"ownership,omitempty"`
+
 	// CredentialsHash is a digest of the API key and MCP tokens the agent was
 	// last written with. A change in the referenced Secrets triggers an update.
 	CredentialsHash string `json:"credentialsHash,omitempty"`

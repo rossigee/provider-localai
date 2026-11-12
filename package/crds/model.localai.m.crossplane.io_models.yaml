@@ -129,6 +129,12 @@ spec:
                     type: string
                   name:
                     type: string
+                  ownership:
+                    description: |-
+                      Ownership is "created" when this provider imported the model, or
+                      "adopted" when it was already in LocalAI on first observation. Deleting
+                      the resource deletes the model only when it is not adopted.
+                    type: string
                   pendingImportSince:
                     description: |-
                       PendingImportSince is the RFC 3339 time the pending import was submitted.

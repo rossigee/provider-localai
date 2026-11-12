@@ -22,6 +22,10 @@ type ModelParameters struct {
 
 type ModelObservation struct {
 	Name string `json:"name,omitempty"`
+	// Ownership is "created" when this provider imported the model, or
+	// "adopted" when it was already in LocalAI on first observation. Deleting
+	// the resource deletes the model only when it is not adopted.
+	Ownership string `json:"ownership,omitempty"`
 	// ConfigHash is the sha256 of the canonical JSON of the configuration the
 	// provider last applied, used to detect spec drift because LocalAI has no
 	// endpoint that returns a model's stored configuration.
