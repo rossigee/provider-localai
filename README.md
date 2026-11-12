@@ -135,10 +135,12 @@ CR spec. An MCP server takes `tokenSecretRef`, and the Secret must be in the
 Agent's namespace. The inline `token` field is no longer accepted: an Agent
 that sets it fails to connect until the value is moved into a Secret.
 
-The provider stores a SHA-256 digest of the API key and MCP tokens in
-`status.atProvider.credentialsHash`, not the values. When a referenced Secret
-changes, the digest changes and the agent is updated. The first observation of
-an existing agent records the digest without rewriting the agent.
+The provider records each referenced Secret's name and `resourceVersion` in
+`status.atProvider.secretVersions`. It stores no secret values. Kubernetes
+changes `resourceVersion` on every edit to a Secret, so when a referenced
+Secret is rotated, the agent is updated. An edit to another key in the same
+Secret also triggers one update. The first observation of an existing agent
+records the versions without rewriting the agent.
 
 ### Skills
 

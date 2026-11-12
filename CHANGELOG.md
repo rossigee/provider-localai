@@ -27,9 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`/v1/models`) and reports Ready only if it succeeds. Previously it reported
   Ready unconditionally. Resources wait for Ready before connecting, so a wrong
   or revoked API key now blocks them with a visible condition.
-- Agents record a SHA-256 digest of their API key and MCP tokens in
-  `status.atProvider.credentialsHash`. Rotating a referenced Secret updates the
-  agent. MCP token values are no longer compared with LocalAI.
+- Agents record the name and `resourceVersion` of each Secret their API key and
+  MCP tokens come from, in `status.atProvider.secretVersions`. Rotating a
+  referenced Secret updates the agent. The status holds no secret values.
+  MCP token values are no longer compared with LocalAI.
 
 ### Fixed
 
