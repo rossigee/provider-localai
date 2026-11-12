@@ -16,30 +16,19 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	laiclient "github.com/rossigee/localai-client/client"
 	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
-	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 const (
-	errNotAgent          = "managed resource is not an Agent"
-	errGetProviderConfig = "cannot get ProviderConfig"
-	errProviderNotReady  = "provider is not ready"
-	errGetAgent          = "cannot get LocalAI agent"
-	errCreateAgent       = "cannot create LocalAI agent"
-	errUpdateAgent       = "cannot update LocalAI agent"
-	errDeleteAgent       = "cannot delete LocalAI agent"
+	errNotAgent         = "managed resource is not an Agent"
+	errProviderNotReady = "provider is not ready"
+	errGetAgent         = "cannot get LocalAI agent"
+	errCreateAgent      = "cannot create LocalAI agent"
+	errUpdateAgent      = "cannot update LocalAI agent"
+	errDeleteAgent      = "cannot delete LocalAI agent"
 
 	controllerName = "agents.agent.localai.m.crossplane.io"
 )
-
-func getProviderConfig(ctx context.Context, kube client.Client, cr *agentv1beta1.Agent) (*v1beta1.ProviderConfig, error) {
-	pcName := cr.GetProviderConfigReference().Name
-	pc := &v1beta1.ProviderConfig{}
-	if err := kube.Get(ctx, client.ObjectKey{Name: pcName, Namespace: "crossplane-system"}, pc); err != nil {
-		return nil, errors.Wrap(err, errGetProviderConfig)
-	}
-	return pc, nil
-}
 
 // Setup registers the Agent controller.
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
@@ -63,7 +52,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if !ok {
 		return nil, errors.New(errNotAgent)
 	}
-	pc, err := getProviderConfig(ctx, c.kube, cr)
+	pc, err := clients.GetProviderConfig(ctx, c.kube, cr.GetNamespace(), cr.GetProviderConfigReference())
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +80,11 @@ func resolveAgentAPIKey(ctx context.Context, kube client.Client, cr *agentv1beta
 	ref := cr.Spec.ForProvider.APIKeySecretRef
 	if ref == nil {
 		return "", nil
+	}
+	// The Secret must live beside the Agent. Otherwise any tenant that can create
+	// an Agent could copy a key from a namespace it cannot read.
+	if ref.Namespace != cr.GetNamespace() {
+		return "", errors.Errorf("apiKeySecretRef must reference a Secret in the Agent's namespace %q; got %q", cr.GetNamespace(), ref.Namespace)
 	}
 	key := ref.Key
 	if key == "" {

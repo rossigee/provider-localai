@@ -58,6 +58,23 @@ func NewLocalAIHTTPClient(ctx context.Context, cfg laiclient.Config) (*http.Clie
 	return nil, errors.New("either an API key or tokenURL/clientID/clientSecret must be configured")
 }
 
+// GetProviderConfig fetches the ProviderConfig named by ref from namespace.
+//
+// ProviderConfig is namespaced, and so are every Agent, Model, Settings and
+// Skill. A managed resource therefore resolves its ProviderConfig in its own
+// namespace only. Looking it up in a fixed namespace would let a tenant that can
+// create a resource use an admin-owned ProviderConfig and its credentials.
+func GetProviderConfig(ctx context.Context, kube client.Client, namespace string, ref *xpv1.ProviderConfigReference) (*v1beta1.ProviderConfig, error) {
+	if ref == nil || ref.Name == "" {
+		return nil, errors.New("spec.providerConfigRef.name is required")
+	}
+	pc := &v1beta1.ProviderConfig{}
+	if err := kube.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: namespace}, pc); err != nil {
+		return nil, errors.Wrapf(err, "cannot get ProviderConfig %s/%s", namespace, ref.Name)
+	}
+	return pc, nil
+}
+
 // GetLocalAIConfig resolves a ProviderConfig into a laiclient.Config.
 //
 // LocalAI's API only accepts API keys (the legacy LOCALAI_API_KEY, or a
@@ -67,10 +84,15 @@ func NewLocalAIHTTPClient(ctx context.Context, cfg laiclient.Config) (*http.Clie
 // credential shape used by the other providers. The OAuth2 fields are kept as
 // a deprecated fallback for deployments fronted by something that does accept
 // OAuth2 bearer tokens.
+//
+// Every Secret the ProviderConfig references must live in the ProviderConfig's
+// own namespace. Without this, a user able to create a ProviderConfig could
+// point credentials.secretRef at any Secret the provider can read.
 func GetLocalAIConfig(ctx context.Context, pc *v1beta1.ProviderConfig, kube client.Client) (laiclient.Config, error) {
 	cfg := laiclient.Config{
 		BaseURL: pc.Spec.BaseURL,
 	}
+	ns := pc.GetNamespace()
 
 	switch {
 	case pc.Spec.Credentials != nil:
@@ -85,6 +107,9 @@ func GetLocalAIConfig(ctx context.Context, pc *v1beta1.ProviderConfig, kube clie
 		cfg.TokenURL = pc.Spec.TokenURL
 		cfg.ClientID = pc.Spec.ClientID
 
+		if err := requireSameNamespace(ns, pc.Spec.ClientSecretRef.Namespace, "spec.clientSecretRef"); err != nil {
+			return cfg, err
+		}
 		secret, err := getSecret(ctx, kube, pc.Spec.ClientSecretRef.Namespace, pc.Spec.ClientSecretRef.Name)
 		if err != nil {
 			return cfg, err
@@ -104,6 +129,9 @@ func GetLocalAIConfig(ctx context.Context, pc *v1beta1.ProviderConfig, kube clie
 	}
 
 	if pc.Spec.RootCACertificateRef != nil {
+		if err := requireSameNamespace(ns, pc.Spec.RootCACertificateRef.Namespace, "spec.rootCACertificateRef"); err != nil {
+			return cfg, err
+		}
 		caSecret, err := getSecret(ctx, kube, pc.Spec.RootCACertificateRef.Namespace, pc.Spec.RootCACertificateRef.Name)
 		if err != nil {
 			return cfg, errors.Wrap(err, "cannot get CA certificate secret")
@@ -122,6 +150,15 @@ func GetLocalAIConfig(ctx context.Context, pc *v1beta1.ProviderConfig, kube clie
 	return cfg, nil
 }
 
+// requireSameNamespace rejects a secret reference that points outside the
+// namespace of the object holding it.
+func requireSameNamespace(objectNamespace, refNamespace, field string) error {
+	if refNamespace != objectNamespace {
+		return errors.Errorf("%s must reference a Secret in namespace %q, the namespace of the ProviderConfig; got %q", field, objectNamespace, refNamespace)
+	}
+	return nil
+}
+
 // resolveAPIKey reads the LocalAI API key from the configured credential secret.
 func resolveAPIKey(ctx context.Context, pc *v1beta1.ProviderConfig, kube client.Client) (string, error) {
 	creds := pc.Spec.Credentials
@@ -133,6 +170,9 @@ func resolveAPIKey(ctx context.Context, pc *v1beta1.ProviderConfig, kube client.
 	}
 
 	ref := creds.SecretRef
+	if err := requireSameNamespace(pc.GetNamespace(), ref.Namespace, "spec.credentials.secretRef"); err != nil {
+		return "", err
+	}
 	key := ref.Key
 	if key == "" {
 		key = "token"
@@ -154,6 +194,8 @@ func resolveAPIKey(ctx context.Context, pc *v1beta1.ProviderConfig, kube client.
 	return apiKey, nil
 }
 
+// getSecret fetches a Secret. Callers must have checked the namespace with
+// requireSameNamespace first when the namespace comes from a user-authored ref.
 func getSecret(ctx context.Context, kube client.Client, namespace, name string) (*corev1.Secret, error) {
 	secret := &corev1.Secret{}
 	nn := types.NamespacedName{Name: name, Namespace: namespace}

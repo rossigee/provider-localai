@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -25,7 +26,6 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	laiclient "github.com/rossigee/localai-client/client"
 	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
-	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
 )
 
@@ -39,6 +39,10 @@ const (
 	errProviderNotReady = "provider is not ready"
 
 	controllerName = "models.model.localai.m.crossplane.io"
+
+	// pendingImportTimeout bounds how long Observe waits for an asynchronous
+	// import to list the model before it submits the import again.
+	pendingImportTimeout = 10 * time.Minute
 )
 
 // ImportModelResponse is the response envelope from POST /models/import.
@@ -46,15 +50,6 @@ type ImportModelResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
 	UUID    string `json:"uuid,omitempty"`
-}
-
-func getProviderConfig(ctx context.Context, kube client.Client, cr *modelv1beta1.Model) (*v1beta1.ProviderConfig, error) {
-	pcName := cr.GetProviderConfigReference().Name
-	pc := &v1beta1.ProviderConfig{}
-	if err := kube.Get(ctx, client.ObjectKey{Name: pcName, Namespace: "crossplane-system"}, pc); err != nil {
-		return nil, errors.Wrap(err, "cannot get ProviderConfig")
-	}
-	return pc, nil
 }
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
@@ -74,7 +69,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if !ok {
 		return nil, errors.New(errNotModel)
 	}
-	pc, err := getProviderConfig(ctx, c.kube, cr)
+	pc, err := clients.GetProviderConfig(ctx, c.kube, cr.GetNamespace(), cr.GetProviderConfigReference())
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +158,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	for _, m := range models {
 		if m.Name == cr.Spec.ForProvider.Name {
+			cr.Status.AtProvider.PendingImportUUID = ""
+			cr.Status.AtProvider.PendingImportSince = ""
 			cr.Status.AtProvider.Name = m.Name
 			cr.Status.SetConditions(xpv1.Available())
 			observed := cr.Status.AtProvider.ConfigHash
@@ -178,7 +175,26 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: observed == hash}, nil
 		}
 	}
+	// The model is not listed. If an import job is still inside its timeout,
+	// report it as existing and current so the reconciler does not post the
+	// import again. Once the model appears, the branch above records it.
+	if cr.Status.AtProvider.PendingImportUUID != "" && !pendingImportExpired(cr.Status.AtProvider.PendingImportSince, time.Now()) {
+		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+	}
+	cr.Status.AtProvider.PendingImportUUID = ""
+	cr.Status.AtProvider.PendingImportSince = ""
 	return managed.ExternalObservation{ResourceExists: false}, nil
+}
+
+// pendingImportExpired reports whether a pending import submitted at since is
+// past pendingImportTimeout. An unparseable timestamp counts as expired, so
+// the import is submitted again rather than waited on indefinitely.
+func pendingImportExpired(since string, now time.Time) bool {
+	t, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		return true
+	}
+	return now.Sub(t) >= pendingImportTimeout
 }
 
 // importModel posts the desired configuration to /models/import. A response
@@ -201,6 +217,13 @@ func (e *external) importModel(ctx context.Context, cr *modelv1beta1.Model) erro
 		return err
 	}
 	cr.Status.AtProvider.ConfigHash = hash
+	if res.UUID != "" {
+		cr.Status.AtProvider.PendingImportUUID = res.UUID
+		cr.Status.AtProvider.PendingImportSince = time.Now().UTC().Format(time.RFC3339)
+	} else {
+		cr.Status.AtProvider.PendingImportUUID = ""
+		cr.Status.AtProvider.PendingImportSince = ""
+	}
 	return nil
 }
 
