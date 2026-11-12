@@ -17,6 +17,7 @@ import (
 	laiclient "github.com/rossigee/localai-client/client"
 	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
+	"github.com/rossigee/provider-localai/internal/controller/shared"
 )
 
 const (
@@ -32,11 +33,13 @@ const (
 
 // Setup registers the Agent controller.
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
+	opts := append(shared.ReconcilerOptions(o, "Agent"),
+		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+	)
 	r := managed.NewReconciler(mgr,
 		resource.ManagedKind(agentv1beta1.SchemeGroupVersion.WithKind("Agent")),
-		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
-		managed.WithLogger(o.Logger.WithValues("controller", "Agent")),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+		opts...,
 	)
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(controllerName).
@@ -217,7 +220,12 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Preserve KB/memory settings that are not managed by the CR. LocalAI
 	// treats omitted fields as "reset to default", so we fetch the current
 	// config and carry over any KB/memory values the CR does not set.
-	if current, err := e.client.GetAgent(ctx, cr.Spec.ForProvider.Name); err == nil && current != nil {
+	current, err := e.client.GetAgent(ctx, cr.Spec.ForProvider.Name)
+	if err != nil && !laiclient.IsNotFound(err) {
+		// Updating without the current settings would reset them.
+		return managed.ExternalUpdate{}, errors.Wrap(err, errGetAgent)
+	}
+	if err == nil {
 		if desired.EnableKB == nil {
 			desired.EnableKB = current.EnableKB
 		}
@@ -228,7 +236,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 			desired.LongTermMemory = current.LongTermMemory
 		}
 	}
-	_, err := e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, desired)
+	_, err = e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, desired)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
 	}

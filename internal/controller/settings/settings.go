@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	settingsv1beta1 "github.com/rossigee/provider-localai/apis/settings/v1beta1"
+	"github.com/rossigee/provider-localai/internal/controller/shared"
 )
 
 const (
@@ -21,11 +22,13 @@ const (
 )
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
+	opts := append(shared.ReconcilerOptions(o, "Settings"),
+		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+	)
 	r := managed.NewReconciler(mgr,
 		resource.ManagedKind(settingsv1beta1.SchemeGroupVersion.WithKind("Settings")),
-		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
-		managed.WithLogger(o.Logger.WithValues("controller", "Settings")),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+		opts...,
 	)
 	return ctrl.NewControllerManagedBy(mgr).Named(controllerName).WithOptions(o.ForControllerRuntime()).For(&settingsv1beta1.Settings{}).Complete(r)
 }

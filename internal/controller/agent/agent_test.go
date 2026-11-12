@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -12,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	laiclient "github.com/rossigee/localai-client/client"
 	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
 )
 
@@ -64,6 +67,32 @@ func TestResolveAgentAPIKeyRejectsCrossNamespaceSecret(t *testing.T) {
 	_, err := resolveAgentAPIKey(context.Background(), kube, cr)
 	if err == nil || !strings.Contains(err.Error(), "Agent's namespace") {
 		t.Fatalf("expected cross-namespace rejection, got %v", err)
+	}
+}
+
+func TestUpdateFailsWhenCurrentAgentUnreadable(t *testing.T) {
+	// If the current agent cannot be read, its KB and memory settings are
+	// unknown. The update must not be sent, or those settings would reset.
+	var writes int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writes++
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.Name = "bookkeeping"
+	e := &external{client: c}
+	if _, err := e.Update(context.Background(), cr); err == nil {
+		t.Fatal("Update succeeded although the current agent could not be read")
+	}
+	if writes != 0 {
+		t.Errorf("Update sent %d write request(s) without the current settings", writes)
 	}
 }
 

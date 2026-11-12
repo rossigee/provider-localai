@@ -213,6 +213,21 @@ func TestObserveClearsPendingImportWhenModelListed(t *testing.T) {
 	}
 }
 
+func TestRawRequestsIgnoreTrailingSlashInBaseURL(t *testing.T) {
+	var gotPath string
+	e, srv := testExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_, _ = io.WriteString(w, `{"success":true}`)
+	})
+	e.cfg.BaseURL = srv.URL + "/"
+	if err := e.do(context.Background(), http.MethodPost, "/models/import", map[string]any{"name": "m"}, nil); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	if gotPath != "/models/import" {
+		t.Errorf("request path = %q, want /models/import", gotPath)
+	}
+}
+
 func TestPendingImportExpiredTreatsBadTimestampAsExpired(t *testing.T) {
 	if !pendingImportExpired("not-a-time", time.Now()) {
 		t.Error("unparseable timestamp should count as expired")
