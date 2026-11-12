@@ -19,6 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rootCACertificateRef`, `clientSecretRef`) must be in the ProviderConfig's
   namespace. An Agent's `apiKeySecretRef` must be in the Agent's namespace.
   Other references are rejected.
+- `spec.forProvider.mcpServers[].token` is no longer accepted. An Agent that
+  sets it fails to connect. Move the value into a Secret in the Agent's
+  namespace and set `tokenSecretRef` instead.
+
+### Changed
+
+- The ProviderConfig controller makes an authenticated request to LocalAI
+  (`/v1/models`) and reports Ready only if it succeeds. Previously it reported
+  Ready unconditionally. Resources wait for Ready before connecting, so a wrong
+  or revoked API key now blocks them with a visible condition.
+- Agents record the name and `resourceVersion` of each Secret their API key and
+  MCP tokens come from, in `status.atProvider.secretVersions`. Rotating a
+  referenced Secret updates the agent. The status holds no secret values.
+  MCP token values are no longer compared with LocalAI.
+
+- Agents, Models and Skills record `status.atProvider.ownership`. An object
+  that was already in LocalAI when the resource first observed it is adopted,
+  and deleting the resource leaves it in place. Objects created by the provider
+  are deleted as before. Resources from before this change keep their current
+  delete behaviour.
 
 ### Fixed
 

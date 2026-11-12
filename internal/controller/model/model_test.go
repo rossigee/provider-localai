@@ -15,6 +15,7 @@ import (
 
 	laiclient "github.com/rossigee/localai-client/client"
 	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
+	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 func testExternal(t *testing.T, h http.HandlerFunc) (*external, *httptest.Server) {
@@ -318,5 +319,36 @@ func TestUpdateReimportsModel(t *testing.T) {
 	}
 	if path != "/models/import" {
 		t.Errorf("path = %s, want /models/import", path)
+	}
+}
+
+func TestDeleteKeepsAdoptedModel(t *testing.T) {
+	var posts int
+	e, _ := testExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			posts++
+		}
+		_, _ = io.WriteString(w, `{"success":true}`)
+	})
+	cr := newModelCR("zen-qwen3.8-flash")
+	cr.Status.AtProvider.Ownership = clients.OwnershipAdopted
+	if _, err := e.Delete(context.Background(), cr); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if posts != 0 {
+		t.Errorf("Delete sent %d request(s) for an adopted model, want 0", posts)
+	}
+}
+
+func TestObserveMarksPreExistingModelAdopted(t *testing.T) {
+	e, _ := testExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"object":"list","data":[{"id":"zen-qwen3.8-flash","object":"model"}]}`)
+	})
+	cr := newModelCR("zen-qwen3.8-flash")
+	if _, err := e.Observe(context.Background(), cr); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if cr.Status.AtProvider.Ownership != clients.OwnershipAdopted {
+		t.Errorf("ownership = %q, want adopted", cr.Status.AtProvider.Ownership)
 	}
 }

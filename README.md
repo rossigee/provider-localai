@@ -94,6 +94,18 @@ namespace. An Agent's `apiKeySecretRef` must be in the Agent's namespace. A
 reference to any other namespace is rejected, so a tenant cannot make the
 provider read a Secret it could not read itself.
 
+### Adoption and deletion
+
+An Agent, Model or Skill that finds an object of the same name already in
+LocalAI on first observation adopts it. The resource then updates the object
+to match its spec, as before. Deleting an adopted resource leaves the LocalAI
+object in place, so a resource cannot remove something it did not create. The
+resource records this in `status.atProvider.ownership`: `created` when this
+provider created the object, `adopted` when it was found already present.
+
+Resources that predate this field have no `ownership` value and are deleted
+with the object, as before.
+
 ## Usage
 
 ```yaml
@@ -130,6 +142,18 @@ fail with `fk_user_api_keys_user`. Supplying the key skips minting.
 Agents do not inherit model-level `mcp.remote` settings; list MCP servers per
 agent.
 
+MCP bearer tokens and the agent API key are read from Secrets, never from the
+CR spec. An MCP server takes `tokenSecretRef`, and the Secret must be in the
+Agent's namespace. The inline `token` field is no longer accepted: an Agent
+that sets it fails to connect until the value is moved into a Secret.
+
+The provider records each referenced Secret's name and `resourceVersion` in
+`status.atProvider.secretVersions`. It stores no secret values. Kubernetes
+changes `resourceVersion` on every edit to a Secret, so when a referenced
+Secret is rotated, the agent is updated. An edit to another key in the same
+Secret also triggers one update. The first observation of an existing agent
+records the versions without rewriting the agent.
+
 ### Skills
 
 `spec.forProvider.skills` is sent as `selected_skills`. LocalAI builds that bind
@@ -161,6 +185,9 @@ LocalAI build that persists it gets it.
 - `Delete` posts to `/models/delete/{name}` and returns immediately; the
   model leaves the list from `/v1/models` when the job completes, which
   `Observe` sees.
+- Changes made to a model in LocalAI outside this provider are not detected.
+  LocalAI has no endpoint that returns a model's stored configuration, so the
+  provider can only track the spec it last applied.
 - There is no endpoint that returns a model's stored configuration, so drift
   detection compares the spec: the sha256 of the canonical desired config is
   recorded in `status.atProvider.configHash`. The first observation of an

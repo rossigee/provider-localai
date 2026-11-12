@@ -11,8 +11,15 @@ type MCPServerSpec struct {
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
 
-	// Token is an optional bearer token. Prefer proxy sidecars that inject
-	// tokens so this field stays empty in Git.
+	// TokenSecretRef references a Secret key holding the optional bearer token
+	// for this server. The Secret must be in the Agent's namespace.
+	// +optional
+	TokenSecretRef *xpv1.SecretKeySelector `json:"tokenSecretRef,omitempty"`
+
+	// Token is no longer supported. It was a plaintext bearer token in the CR
+	// spec. Setting it makes the Agent fail to connect; move the value into a
+	// Secret and set tokenSecretRef.
+	// Deprecated: use tokenSecretRef.
 	// +optional
 	Token string `json:"token,omitempty"`
 }
@@ -85,6 +92,17 @@ type AgentParameters struct {
 type AgentObservation struct {
 	// Name of the agent.
 	Name string `json:"name,omitempty"`
+
+	// Ownership is "created" when this provider created the agent in LocalAI,
+	// or "adopted" when it was already there on first observation. Deleting the
+	// resource deletes the agent only when it is not adopted.
+	Ownership string `json:"ownership,omitempty"`
+
+	// SecretVersions records the Secrets the API key and MCP tokens were last
+	// written from, as "namespace/name@resourceVersion" entries joined with
+	// commas. It contains no secret values. A change in any referenced Secret
+	// triggers an update.
+	SecretVersions string `json:"secretVersions,omitempty"`
 }
 
 // AgentSpec defines the desired state of an Agent.

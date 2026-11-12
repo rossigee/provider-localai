@@ -16,6 +16,7 @@ import (
 
 	laiclient "github.com/rossigee/localai-client/client"
 	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
+	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 func testKube(t *testing.T, objs ...client.Object) client.Client {
@@ -25,6 +26,12 @@ func testKube(t *testing.T, objs ...client.Object) client.Client {
 		t.Fatalf("corev1 scheme: %v", err)
 	}
 	return fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
+}
+
+// resolveAgentAPIKey returns only the API key from resolveCredentials.
+func resolveAgentAPIKey(ctx context.Context, kube client.Client, cr *agentv1beta1.Agent) (string, error) {
+	creds, err := resolveCredentials(ctx, kube, cr)
+	return creds.apiKey, err
 }
 
 func agentWithKeyRef(ns string, ref *xpv1.SecretKeySelector) *agentv1beta1.Agent {
@@ -100,5 +107,158 @@ func TestResolveAgentAPIKeyNoRef(t *testing.T) {
 	got, err := resolveAgentAPIKey(context.Background(), testKube(t), agentWithKeyRef("tenant-a", nil))
 	if err != nil || got != "" {
 		t.Fatalf("got (%q, %v), want empty key and no error", got, err)
+	}
+}
+
+func TestObserveRecordsCredentialBaselineThenDetectsRotation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"name":"bookkeeping","model":"qwen3-8b"}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.Name = "bookkeeping"
+	cr.Spec.ForProvider.Model = "qwen3-8b"
+
+	e := &external{client: c, creds: credentials{apiKey: "key-1", versions: "tenant-a/agent-key@1"}}
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceUpToDate || cr.Status.AtProvider.SecretVersions == "" {
+		t.Fatalf("first observation should record a baseline and be up to date, got %+v", obs)
+	}
+
+	// The Secret is rotated: the digest changes and the agent must be updated.
+	e.creds = credentials{apiKey: "key-2", versions: "tenant-a/agent-key@2"}
+	obs, err = e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe after rotation: %v", err)
+	}
+	if obs.ResourceUpToDate {
+		t.Error("a rotated API key did not mark the agent out of date")
+	}
+}
+
+func TestResolveCredentialsRecordsSecretVersionsNotValues(t *testing.T) {
+	kube := testKube(t, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "tenant-a", Name: "agent-key", ResourceVersion: "42"},
+		Data:       map[string][]byte{"token": []byte("super-secret-value")},
+	})
+	cr := agentWithKeyRef("tenant-a", &xpv1.SecretKeySelector{
+		SecretReference: xpv1.SecretReference{Namespace: "tenant-a", Name: "agent-key"},
+		Key:             "token",
+	})
+	creds, err := resolveCredentials(context.Background(), kube, cr)
+	if err != nil {
+		t.Fatalf("resolveCredentials: %v", err)
+	}
+	if creds.versions != "tenant-a/agent-key@42" {
+		t.Errorf("versions = %q, want tenant-a/agent-key@42", creds.versions)
+	}
+	if strings.Contains(creds.versions, "super-secret-value") {
+		t.Error("versions contains the secret value")
+	}
+}
+
+func TestResolveCredentialsRejectsInlineMCPToken(t *testing.T) {
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.MCPServers = []agentv1beta1.MCPServerSpec{{URL: "http://mcp", Token: "plaintext"}}
+	_, err := resolveCredentials(context.Background(), testKube(t), cr)
+	if err == nil || !strings.Contains(err.Error(), "tokenSecretRef") {
+		t.Fatalf("expected an error pointing at tokenSecretRef, got %v", err)
+	}
+}
+
+func TestResolveCredentialsReadsMCPTokenFromOwnNamespace(t *testing.T) {
+	kube := testKube(t, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "tenant-a", Name: "mcp"},
+		Data:       map[string][]byte{"token": []byte("mcp-secret")},
+	})
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.MCPServers = []agentv1beta1.MCPServerSpec{{
+		URL:            "http://mcp",
+		TokenSecretRef: &xpv1.SecretKeySelector{SecretReference: xpv1.SecretReference{Namespace: "tenant-a", Name: "mcp"}, Key: "token"},
+	}}
+	creds, err := resolveCredentials(context.Background(), kube, cr)
+	if err != nil {
+		t.Fatalf("resolveCredentials: %v", err)
+	}
+	if len(creds.mcpTokens) != 1 || creds.mcpTokens[0] != "mcp-secret" {
+		t.Errorf("mcpTokens = %v, want [mcp-secret]", creds.mcpTokens)
+	}
+}
+
+func TestResolveCredentialsRejectsCrossNamespaceMCPToken(t *testing.T) {
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.MCPServers = []agentv1beta1.MCPServerSpec{{
+		URL:            "http://mcp",
+		TokenSecretRef: &xpv1.SecretKeySelector{SecretReference: xpv1.SecretReference{Namespace: "crossplane-system", Name: "mcp"}, Key: "token"},
+	}}
+	_, err := resolveCredentials(context.Background(), testKube(t), cr)
+	if err == nil || !strings.Contains(err.Error(), "Agent's namespace") {
+		t.Fatalf("expected cross-namespace rejection, got %v", err)
+	}
+}
+
+// deleteRequests returns how many non-GET requests reach LocalAI when the
+// agent is deleted with the given ownership.
+func deleteRequests(t *testing.T, ownership string) int {
+	t.Helper()
+	var writes int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writes++
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.Name = "bookkeeping"
+	cr.Status.AtProvider.Ownership = ownership
+	if _, err := (&external{client: c}).Delete(context.Background(), cr); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	return writes
+}
+
+func TestDeleteKeepsAdoptedAgent(t *testing.T) {
+	if n := deleteRequests(t, clients.OwnershipAdopted); n != 0 {
+		t.Errorf("Delete sent %d write request(s) for an adopted agent, want 0", n)
+	}
+}
+
+func TestDeleteRemovesCreatedAndLegacyAgents(t *testing.T) {
+	for _, o := range []string{clients.OwnershipCreated, ""} {
+		if n := deleteRequests(t, o); n == 0 {
+			t.Errorf("Delete with ownership %q sent no request, want the agent removed", o)
+		}
+	}
+}
+
+func TestObserveMarksPreExistingAgentAdopted(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"name":"bookkeeping","model":"qwen3-8b"}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.Name = "bookkeeping"
+	cr.Spec.ForProvider.Model = "qwen3-8b"
+	if _, err := (&external{client: c}).Observe(context.Background(), cr); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if cr.Status.AtProvider.Ownership != clients.OwnershipAdopted {
+		t.Errorf("ownership = %q, want adopted", cr.Status.AtProvider.Ownership)
 	}
 }
