@@ -27,7 +27,7 @@ permissions:
   actions: read    # Needed for detecting duplicate actions
 
 env:
-  GO_VERSION: '1.27.3'
+  GO_VERSION: '1.27.4'
   GOLANGCI_VERSION: '2.15.0'
   GOLANGCILINT_VERSION: '2.15.0'
   DOCKER_BUILDX_VERSION: 'v0.11.2'
@@ -153,7 +153,7 @@ jobs:
           cp go.mod go.mod.bak && cp go.sum go.sum.bak
           GOWORK=$(mktemp -d)/go.work && echo "go 1.24" > $GOWORK && GOWORK=$GOWORK go install golang.org/x/vuln/cmd/govulncheck@v1.5.0 || { GOWORK_DIR=$(dirname $GOWORK); rm -f $GOWORK 2>/dev/null; rmdir $GOWORK_DIR 2>/dev/null; mv go.mod.bak go.mod 2>/dev/null; mv go.sum.bak go.sum 2>/dev/null; exit 1; }
           set +e
-          GOFLAGS=-mod=mod GOWORK=$GOWORK go run -mod=mod golang.org/x/vuln/cmd/govulncheck ./... > /tmp/govulncheck.out 2>&1
+          "$(go env GOPATH)/bin/govulncheck" ./... > /tmp/govulncheck.out 2>&1
           VULN_RC=$?
           set -e
           mv go.mod.bak go.mod && mv go.sum.bak go.sum

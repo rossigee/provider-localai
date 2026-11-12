@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Model whose import is still queued in LocalAI is no longer re-posted on
   every poll. The job ID is kept in `status.atProvider.pendingImportUUID` and
   the import is resubmitted after 10 minutes if the model has not appeared.
+- Go moves to 1.27.4, which fixes GO-2026-6859 (HTTP/1 server crash via a
+  `MaxBytesReader` header race in `net/http`). The govulncheck step had been
+  silently failing to run, so the finding went unreported. It now runs the
+  installed scanner directly.
 - Auto-merge for Dependabot PRs no longer treats a missing or unfinished
   required check as passed.
 - govulncheck in CI and the security workflow fails when the scanner itself
