@@ -98,9 +98,11 @@ type AgentObservation struct {
 	// resource deletes the agent only when it is not adopted.
 	Ownership string `json:"ownership,omitempty"`
 
-	// CredentialsHash is a digest of the API key and MCP tokens the agent was
-	// last written with. A change in the referenced Secrets triggers an update.
-	CredentialsHash string `json:"credentialsHash,omitempty"`
+	// SecretVersions records the Secrets the API key and MCP tokens were last
+	// written from, as "namespace/name@resourceVersion" entries joined with
+	// commas. It contains no secret values. A change in any referenced Secret
+	// triggers an update.
+	SecretVersions string `json:"secretVersions,omitempty"`
 }
 
 // AgentSpec defines the desired state of an Agent.

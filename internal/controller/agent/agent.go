@@ -2,8 +2,6 @@ package agent
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
@@ -89,50 +87,52 @@ type credentials struct {
 	// mcpTokens are index-aligned with spec.forProvider.mcpServers. An entry is
 	// empty when that server has no tokenSecretRef.
 	mcpTokens []string
-}
-
-// hash digests the credential values. It is recorded in status so that a
-// rotated Secret is detected without storing the values themselves.
-func (c credentials) hash() string {
-	h := sha256.New()
-	h.Write([]byte(c.apiKey))
-	for _, t := range c.mcpTokens {
-		h.Write([]byte{0})
-		h.Write([]byte(t))
-	}
-	return hex.EncodeToString(h.Sum(nil))
+	// versions identifies the Secrets the values came from, as
+	// "namespace/name@resourceVersion" joined with commas. Kubernetes changes
+	// resourceVersion on every edit to a Secret, so a rotation changes this
+	// string. It records no secret material, so it is safe to keep in status.
+	versions string
 }
 
 // resolveCredentials reads every Secret the agent refers to.
 func resolveCredentials(ctx context.Context, kube client.Client, cr *agentv1beta1.Agent) (credentials, error) {
-	apiKey, err := resolveSecretValue(ctx, kube, cr.GetNamespace(), cr.Spec.ForProvider.APIKeySecretRef, "apiKeySecretRef")
+	apiKey, apiKeyVersion, err := resolveSecretValue(ctx, kube, cr.GetNamespace(), cr.Spec.ForProvider.APIKeySecretRef, "apiKeySecretRef")
 	if err != nil {
 		return credentials{}, err
 	}
 	creds := credentials{apiKey: apiKey, mcpTokens: make([]string, 0, len(cr.Spec.ForProvider.MCPServers))}
+	versions := []string{}
+	if apiKeyVersion != "" {
+		versions = append(versions, apiKeyVersion)
+	}
 	for i, s := range cr.Spec.ForProvider.MCPServers {
 		if s.Token != "" {
 			return credentials{}, errors.Errorf(errInlineMCPToken, i)
 		}
-		t, err := resolveSecretValue(ctx, kube, cr.GetNamespace(), s.TokenSecretRef, "mcpServers.tokenSecretRef")
+		t, v, err := resolveSecretValue(ctx, kube, cr.GetNamespace(), s.TokenSecretRef, "mcpServers.tokenSecretRef")
 		if err != nil {
 			return credentials{}, err
 		}
 		creds.mcpTokens = append(creds.mcpTokens, t)
+		if v != "" {
+			versions = append(versions, v)
+		}
 	}
+	creds.versions = strings.Join(versions, ",")
 	return creds, nil
 }
 
 // resolveSecretValue reads one key from a Secret that must live in the
-// Agent's namespace. A nil ref yields an empty value.
-func resolveSecretValue(ctx context.Context, kube client.Client, agentNamespace string, ref *xpv1.SecretKeySelector, field string) (string, error) {
+// Agent's namespace. It returns the value and the Secret's version. A nil ref
+// yields empty results.
+func resolveSecretValue(ctx context.Context, kube client.Client, agentNamespace string, ref *xpv1.SecretKeySelector, field string) (string, string, error) {
 	if ref == nil {
-		return "", nil
+		return "", "", nil
 	}
 	// The Secret must live beside the Agent. Otherwise any tenant that can create
 	// an Agent could copy a value from a namespace it cannot read.
 	if ref.Namespace != agentNamespace {
-		return "", errors.Errorf("%s must reference a Secret in the Agent's namespace %q; got %q", field, agentNamespace, ref.Namespace)
+		return "", "", errors.Errorf("%s must reference a Secret in the Agent's namespace %q; got %q", field, agentNamespace, ref.Namespace)
 	}
 	key := ref.Key
 	if key == "" {
@@ -140,13 +140,14 @@ func resolveSecretValue(ctx context.Context, kube client.Client, agentNamespace 
 	}
 	secret := &corev1.Secret{}
 	if err := kube.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: ref.Namespace}, secret); err != nil {
-		return "", errors.Wrapf(err, "cannot get %s secret %s/%s", field, ref.Namespace, ref.Name)
+		return "", "", errors.Wrapf(err, "cannot get %s secret %s/%s", field, ref.Namespace, ref.Name)
 	}
 	raw, ok := secret.Data[key]
 	if !ok {
-		return "", errors.Errorf("key %q not found in secret %s/%s", key, ref.Namespace, ref.Name)
+		return "", "", errors.Errorf("key %q not found in secret %s/%s", key, ref.Namespace, ref.Name)
 	}
-	return strings.TrimSpace(string(raw)), nil
+	version := ref.Namespace + "/" + ref.Name + "@" + secret.ResourceVersion
+	return strings.TrimSpace(string(raw)), version, nil
 }
 
 type external struct {
@@ -169,13 +170,12 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.AtProvider.Name = a.Name
 	cr.Status.SetConditions(xpv1.Available())
 
-	digest := e.creds.hash()
-	if cr.Status.AtProvider.CredentialsHash == "" {
+	if cr.Status.AtProvider.SecretVersions == "" {
 		// First observation: record the baseline without rewriting the agent,
 		// so existing agents are adopted rather than overwritten.
-		cr.Status.AtProvider.CredentialsHash = digest
+		cr.Status.AtProvider.SecretVersions = e.creds.versions
 	}
-	credsCurrent := cr.Status.AtProvider.CredentialsHash == digest
+	credsCurrent := cr.Status.AtProvider.SecretVersions == e.creds.versions
 	return managed.ExternalObservation{
 		ResourceExists:   true,
 		ResourceUpToDate: agentUpToDate(cr, a) && credsCurrent,
@@ -263,7 +263,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
 	}
-	cr.Status.AtProvider.CredentialsHash = e.creds.hash()
+	cr.Status.AtProvider.SecretVersions = e.creds.versions
 	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
 	return managed.ExternalCreation{}, nil
 }
@@ -294,7 +294,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
 	}
-	cr.Status.AtProvider.CredentialsHash = e.creds.hash()
+	cr.Status.AtProvider.SecretVersions = e.creds.versions
 	return managed.ExternalUpdate{}, nil
 }
 

@@ -235,11 +235,6 @@ spec:
               atProvider:
                 description: AgentObservation is the observed state of a LocalAI Agent.
                 properties:
-                  credentialsHash:
-                    description: |-
-                      CredentialsHash is a digest of the API key and MCP tokens the agent was
-                      last written with. A change in the referenced Secrets triggers an update.
-                    type: string
                   name:
                     description: Name of the agent.
                     type: string
@@ -248,6 +243,13 @@ spec:
                       Ownership is "created" when this provider created the agent in LocalAI,
                       or "adopted" when it was already there on first observation. Deleting the
                       resource deletes the agent only when it is not adopted.
+                    type: string
+                  secretVersions:
+                    description: |-
+                      SecretVersions records the Secrets the API key and MCP tokens were last
+                      written from, as "namespace/name@resourceVersion" entries joined with
+                      commas. It contains no secret values. A change in any referenced Secret
+                      triggers an update.
                     type: string
                 type: object
               conditions:

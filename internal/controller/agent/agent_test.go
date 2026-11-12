@@ -123,23 +123,44 @@ func TestObserveRecordsCredentialBaselineThenDetectsRotation(t *testing.T) {
 	cr.Spec.ForProvider.Name = "bookkeeping"
 	cr.Spec.ForProvider.Model = "qwen3-8b"
 
-	e := &external{client: c, creds: credentials{apiKey: "key-1"}}
+	e := &external{client: c, creds: credentials{apiKey: "key-1", versions: "tenant-a/agent-key@1"}}
 	obs, err := e.Observe(context.Background(), cr)
 	if err != nil {
 		t.Fatalf("Observe: %v", err)
 	}
-	if !obs.ResourceUpToDate || cr.Status.AtProvider.CredentialsHash == "" {
+	if !obs.ResourceUpToDate || cr.Status.AtProvider.SecretVersions == "" {
 		t.Fatalf("first observation should record a baseline and be up to date, got %+v", obs)
 	}
 
 	// The Secret is rotated: the digest changes and the agent must be updated.
-	e.creds = credentials{apiKey: "key-2"}
+	e.creds = credentials{apiKey: "key-2", versions: "tenant-a/agent-key@2"}
 	obs, err = e.Observe(context.Background(), cr)
 	if err != nil {
 		t.Fatalf("Observe after rotation: %v", err)
 	}
 	if obs.ResourceUpToDate {
 		t.Error("a rotated API key did not mark the agent out of date")
+	}
+}
+
+func TestResolveCredentialsRecordsSecretVersionsNotValues(t *testing.T) {
+	kube := testKube(t, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "tenant-a", Name: "agent-key", ResourceVersion: "42"},
+		Data:       map[string][]byte{"token": []byte("super-secret-value")},
+	})
+	cr := agentWithKeyRef("tenant-a", &xpv1.SecretKeySelector{
+		SecretReference: xpv1.SecretReference{Namespace: "tenant-a", Name: "agent-key"},
+		Key:             "token",
+	})
+	creds, err := resolveCredentials(context.Background(), kube, cr)
+	if err != nil {
+		t.Fatalf("resolveCredentials: %v", err)
+	}
+	if creds.versions != "tenant-a/agent-key@42" {
+		t.Errorf("versions = %q, want tenant-a/agent-key@42", creds.versions)
+	}
+	if strings.Contains(creds.versions, "super-secret-value") {
+		t.Error("versions contains the secret value")
 	}
 }
 
