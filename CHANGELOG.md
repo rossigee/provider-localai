@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking
+
+- Agent, Model, Skill and Settings resolve their ProviderConfig in their own
+  namespace. The provider no longer falls back to `crossplane-system`. Create
+  a ProviderConfig beside each resource, or set the resource's namespace to
+  the ProviderConfig's namespace.
+- Secrets referenced by a ProviderConfig (`credentials.secretRef`,
+  `rootCACertificateRef`, `clientSecretRef`) must be in the ProviderConfig's
+  namespace. An Agent's `apiKeySecretRef` must be in the Agent's namespace.
+  Other references are rejected.
+
+### Fixed
+
+- A Model whose import is still queued in LocalAI is no longer re-posted on
+  every poll. The job ID is kept in `status.atProvider.pendingImportUUID` and
+  the import is resubmitted after 10 minutes if the model has not appeared.
+- Auto-merge for Dependabot PRs no longer treats a missing or unfinished
+  required check as passed.
+- govulncheck in CI and the security workflow fails when the scanner itself
+  errors, instead of reporting "No vulnerabilities found".
+- The auto-merge notification step passes PR title and labels through
+  environment variables rather than interpolating them into the script.
+
 ## [0.2.2] - 2026-11-08
 
 ### Fixed

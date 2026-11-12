@@ -26,6 +26,13 @@ type ModelObservation struct {
 	// provider last applied, used to detect spec drift because LocalAI has no
 	// endpoint that returns a model's stored configuration.
 	ConfigHash string `json:"configHash,omitempty"`
+	// PendingImportUUID is the job ID LocalAI returned for an import that has
+	// not yet appeared in the model list. While it is set, Observe waits for
+	// the model rather than re-posting the import on every poll.
+	PendingImportUUID string `json:"pendingImportUUID,omitempty"`
+	// PendingImportSince is the RFC 3339 time the pending import was submitted.
+	// After a timeout the import is treated as failed and submitted again.
+	PendingImportSince string `json:"pendingImportSince,omitempty"`
 }
 
 type ModelSpec struct {

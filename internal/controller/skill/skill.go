@@ -15,7 +15,6 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	laiclient "github.com/rossigee/localai-client/client"
 	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
-	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
 )
 
@@ -28,15 +27,6 @@ const (
 
 	controllerName = "skills.skill.localai.m.crossplane.io"
 )
-
-func getProviderConfig(ctx context.Context, kube client.Client, cr *skillv1beta1.Skill) (*v1beta1.ProviderConfig, error) {
-	pcName := cr.GetProviderConfigReference().Name
-	pc := &v1beta1.ProviderConfig{}
-	if err := kube.Get(ctx, client.ObjectKey{Name: pcName, Namespace: "crossplane-system"}, pc); err != nil {
-		return nil, errors.Wrap(err, "cannot get ProviderConfig")
-	}
-	return pc, nil
-}
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	r := managed.NewReconciler(mgr,
@@ -59,7 +49,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if !ok {
 		return nil, errors.New(errNotSkill)
 	}
-	pc, err := getProviderConfig(ctx, c.kube, cr)
+	pc, err := clients.GetProviderConfig(ctx, c.kube, cr.GetNamespace(), cr.GetProviderConfigReference())
 	if err != nil {
 		return nil, err
 	}

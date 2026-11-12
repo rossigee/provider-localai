@@ -2,6 +2,7 @@ apiVersion: agent.localai.m.crossplane.io/v1beta1
 kind: Agent
 metadata:
   name: bookkeeping
+  namespace: crossplane-system
 spec:
   forProvider:
     name: bookkeeping
