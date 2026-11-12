@@ -27,6 +27,12 @@ func testKube(t *testing.T, objs ...client.Object) client.Client {
 	return fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 }
 
+// resolveAgentAPIKey returns only the API key from resolveCredentials.
+func resolveAgentAPIKey(ctx context.Context, kube client.Client, cr *agentv1beta1.Agent) (string, error) {
+	creds, err := resolveCredentials(ctx, kube, cr)
+	return creds.apiKey, err
+}
+
 func agentWithKeyRef(ns string, ref *xpv1.SecretKeySelector) *agentv1beta1.Agent {
 	return &agentv1beta1.Agent{
 		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "bookkeeping"},
@@ -100,5 +106,78 @@ func TestResolveAgentAPIKeyNoRef(t *testing.T) {
 	got, err := resolveAgentAPIKey(context.Background(), testKube(t), agentWithKeyRef("tenant-a", nil))
 	if err != nil || got != "" {
 		t.Fatalf("got (%q, %v), want empty key and no error", got, err)
+	}
+}
+
+func TestObserveRecordsCredentialBaselineThenDetectsRotation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"name":"bookkeeping","model":"qwen3-8b"}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.Name = "bookkeeping"
+	cr.Spec.ForProvider.Model = "qwen3-8b"
+
+	e := &external{client: c, creds: credentials{apiKey: "key-1"}}
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceUpToDate || cr.Status.AtProvider.CredentialsHash == "" {
+		t.Fatalf("first observation should record a baseline and be up to date, got %+v", obs)
+	}
+
+	// The Secret is rotated: the digest changes and the agent must be updated.
+	e.creds = credentials{apiKey: "key-2"}
+	obs, err = e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe after rotation: %v", err)
+	}
+	if obs.ResourceUpToDate {
+		t.Error("a rotated API key did not mark the agent out of date")
+	}
+}
+
+func TestResolveCredentialsRejectsInlineMCPToken(t *testing.T) {
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.MCPServers = []agentv1beta1.MCPServerSpec{{URL: "http://mcp", Token: "plaintext"}}
+	_, err := resolveCredentials(context.Background(), testKube(t), cr)
+	if err == nil || !strings.Contains(err.Error(), "tokenSecretRef") {
+		t.Fatalf("expected an error pointing at tokenSecretRef, got %v", err)
+	}
+}
+
+func TestResolveCredentialsReadsMCPTokenFromOwnNamespace(t *testing.T) {
+	kube := testKube(t, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "tenant-a", Name: "mcp"},
+		Data:       map[string][]byte{"token": []byte("mcp-secret")},
+	})
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.MCPServers = []agentv1beta1.MCPServerSpec{{
+		URL:            "http://mcp",
+		TokenSecretRef: &xpv1.SecretKeySelector{SecretReference: xpv1.SecretReference{Namespace: "tenant-a", Name: "mcp"}, Key: "token"},
+	}}
+	creds, err := resolveCredentials(context.Background(), kube, cr)
+	if err != nil {
+		t.Fatalf("resolveCredentials: %v", err)
+	}
+	if len(creds.mcpTokens) != 1 || creds.mcpTokens[0] != "mcp-secret" {
+		t.Errorf("mcpTokens = %v, want [mcp-secret]", creds.mcpTokens)
+	}
+}
+
+func TestResolveCredentialsRejectsCrossNamespaceMCPToken(t *testing.T) {
+	cr := agentWithKeyRef("tenant-a", nil)
+	cr.Spec.ForProvider.MCPServers = []agentv1beta1.MCPServerSpec{{
+		URL:            "http://mcp",
+		TokenSecretRef: &xpv1.SecretKeySelector{SecretReference: xpv1.SecretReference{Namespace: "crossplane-system", Name: "mcp"}, Key: "token"},
+	}}
+	_, err := resolveCredentials(context.Background(), testKube(t), cr)
+	if err == nil || !strings.Contains(err.Error(), "Agent's namespace") {
+		t.Fatalf("expected cross-namespace rejection, got %v", err)
 	}
 }

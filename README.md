@@ -130,6 +130,16 @@ fail with `fk_user_api_keys_user`. Supplying the key skips minting.
 Agents do not inherit model-level `mcp.remote` settings; list MCP servers per
 agent.
 
+MCP bearer tokens and the agent API key are read from Secrets, never from the
+CR spec. An MCP server takes `tokenSecretRef`, and the Secret must be in the
+Agent's namespace. The inline `token` field is no longer accepted: an Agent
+that sets it fails to connect until the value is moved into a Secret.
+
+The provider stores a SHA-256 digest of the API key and MCP tokens in
+`status.atProvider.credentialsHash`, not the values. When a referenced Secret
+changes, the digest changes and the agent is updated. The first observation of
+an existing agent records the digest without rewriting the agent.
+
 ### Skills
 
 `spec.forProvider.skills` is sent as `selected_skills`. LocalAI builds that bind
@@ -161,6 +171,9 @@ LocalAI build that persists it gets it.
 - `Delete` posts to `/models/delete/{name}` and returns immediately; the
   model leaves the list from `/v1/models` when the job completes, which
   `Observe` sees.
+- Changes made to a model in LocalAI outside this provider are not detected.
+  LocalAI has no endpoint that returns a model's stored configuration, so the
+  provider can only track the spec it last applied.
 - There is no endpoint that returns a model's stored configuration, so drift
   detection compares the spec: the sha256 of the canonical desired config is
   recorded in `status.atProvider.configHash`. The first observation of an

@@ -11,8 +11,15 @@ type MCPServerSpec struct {
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
 
-	// Token is an optional bearer token. Prefer proxy sidecars that inject
-	// tokens so this field stays empty in Git.
+	// TokenSecretRef references a Secret key holding the optional bearer token
+	// for this server. The Secret must be in the Agent's namespace.
+	// +optional
+	TokenSecretRef *xpv1.SecretKeySelector `json:"tokenSecretRef,omitempty"`
+
+	// Token is no longer supported. It was a plaintext bearer token in the CR
+	// spec. Setting it makes the Agent fail to connect; move the value into a
+	// Secret and set tokenSecretRef.
+	// Deprecated: use tokenSecretRef.
 	// +optional
 	Token string `json:"token,omitempty"`
 }
@@ -85,6 +92,10 @@ type AgentParameters struct {
 type AgentObservation struct {
 	// Name of the agent.
 	Name string `json:"name,omitempty"`
+
+	// CredentialsHash is a digest of the API key and MCP tokens the agent was
+	// last written with. A change in the referenced Secrets triggers an update.
+	CredentialsHash string `json:"credentialsHash,omitempty"`
 }
 
 // AgentSpec defines the desired state of an Agent.
