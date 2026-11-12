@@ -177,10 +177,23 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Check for known malicious packages
+        env:
+          OSV_VERSION: v2.7.1
+          # SHA-256 of osv-scanner_linux_amd64 from the v2.7.1 SHA256SUMS file.
+          OSV_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
         run: |
-          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
+          curl -sSfL "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64" -o osv-scanner
+          echo "${OSV_SHA256}  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
-          ./osv-scanner --lockfile=go.sum --format=sarif --output=osv-results.sarif || true
+          set +e
+          ./osv-scanner --lockfile=go.mod --format=sarif --output-file=osv-results.sarif
+          RC=$?
+          set -e
+          # Exit 1 means findings were reported to the SARIF file, which is uploaded
+          # either way. Any other non-zero exit is a scanner failure.
+          if [ "$RC" -ne 0 ] && [ "$RC" -ne 1 ]; then
+            echo "osv-scanner failed with exit code $RC"; exit "$RC"
+          fi
 
       - name: Upload OSV scan results
         if: always() && hashFiles('osv-results.sarif') != ''
