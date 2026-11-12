@@ -27,6 +27,7 @@ import (
 	laiclient "github.com/rossigee/localai-client/client"
 	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
+	"github.com/rossigee/provider-localai/internal/controller/shared"
 )
 
 const (
@@ -53,11 +54,13 @@ type ImportModelResponse struct {
 }
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
+	opts := append(shared.ReconcilerOptions(o, "Model"),
+		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+	)
 	r := managed.NewReconciler(mgr,
 		resource.ManagedKind(modelv1beta1.SchemeGroupVersion.WithKind("Model")),
-		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
-		managed.WithLogger(o.Logger.WithValues("controller", "Model")),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+		opts...,
 	)
 	return ctrl.NewControllerManagedBy(mgr).Named(controllerName).WithOptions(o.ForControllerRuntime()).For(&modelv1beta1.Model{}).Complete(r)
 }
@@ -240,7 +243,7 @@ func (e *external) do(ctx context.Context, method, path string, body, out any) e
 		}
 		r = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, e.cfg.BaseURL+path, r)
+	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(e.cfg.BaseURL, "/")+path, r)
 	if err != nil {
 		return err
 	}

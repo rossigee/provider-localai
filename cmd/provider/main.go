@@ -23,6 +23,7 @@ import (
 	"time"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -89,7 +90,7 @@ func (o *options) managerOptions() ctrl.Options {
 		// server. Switching to Leases only and longer leases appears to
 		// alleviate this.
 		LeaderElection:             o.leaderElection,
-		LeaderElectionID:           "crossplane-leader-election-cp-provider-template",
+		LeaderElectionID:           "crossplane-leader-election-provider-localai",
 		LeaderElectionResourceLock: resourcelock.LeasesResourceLock,
 		LeaseDuration:              func() *time.Duration { d := 60 * time.Second; return &d }(),
 		RenewDeadline:              func() *time.Duration { d := 50 * time.Second; return &d }(),
@@ -109,12 +110,16 @@ func (o *options) managerOptions() ctrl.Options {
 // controllerOptions assembles the crossplane-runtime controller configuration.
 func (o *options) controllerOptions(log logging.Logger, mrStateMetrics *statemetrics.MRStateMetrics) xpcontroller.Options {
 
+	features := &feature.Flags{}
+	if o.enableManagementPolicies {
+		features.Enable(feature.EnableBetaManagementPolicies)
+	}
+
 	return xpcontroller.Options{
 		Logger:                  log,
 		MaxConcurrentReconciles: o.maxReconcileRate,
 		PollInterval:            o.pollInterval,
-		GlobalRateLimiter:       ratelimiter.NewGlobal(o.maxReconcileRate),
-		Features:                nil,
+		Features:                features,
 		MetricOptions: &xpcontroller.MetricOptions{
 			PollStateMetricInterval: o.pollStateMetricInterval,
 			MRStateMetrics:          mrStateMetrics,

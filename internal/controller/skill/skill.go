@@ -16,6 +16,7 @@ import (
 	laiclient "github.com/rossigee/localai-client/client"
 	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
 	"github.com/rossigee/provider-localai/internal/clients"
+	"github.com/rossigee/provider-localai/internal/controller/shared"
 )
 
 const (
@@ -29,11 +30,13 @@ const (
 )
 
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
+	opts := append(shared.ReconcilerOptions(o, "Skill"),
+		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+	)
 	r := managed.NewReconciler(mgr,
 		resource.ManagedKind(skillv1beta1.SchemeGroupVersion.WithKind("Skill")),
-		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
-		managed.WithLogger(o.Logger.WithValues("controller", "Skill")),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+		opts...,
 	)
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(controllerName).
