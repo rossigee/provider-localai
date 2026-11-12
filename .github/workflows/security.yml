@@ -1,5 +1,5 @@
 # Standardized Security Template for Crossplane Providers
-# Version: 2026-09-08 - Updated for Go 1.27.3 (aligned with ci/release templates)
+# Version: 2026-09-08 - Updated for Go 1.27.4 (aligned with ci/release templates)
 #
 # This template provides:
 # - AUTOMATED security scanning on pushes/PRs (with no-op detection)
@@ -243,7 +243,7 @@ jobs:
 #    - Clear notifications when enabled
 #
 # 5. STANDARDIZED VERSION
-#    - Go 1.27.3
+#    - Go 1.27.4
 #    - Actions: checkout@v7, setup-go@v7, codeql-action@v4
 #    - Runners: ubuntu-24.04
 #
