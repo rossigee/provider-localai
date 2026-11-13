@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking (Model URLs)
+
+- A Model whose configuration contains an `http` or `https` URL is rejected
+  unless the URL's host is listed in the ProviderConfig's
+  `spec.allowedModelUpstreams`. The default is an empty list. This covers
+  `proxy.upstream_url`, `download_files`, and URI-valued `model` or `mmproj`.
+  Add the hosts to the ProviderConfig before those Models are next applied.
+
 ### Changed
 
 - The `internal/tracing` package, which nothing imported, is removed. Its

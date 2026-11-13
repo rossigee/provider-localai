@@ -15,6 +15,10 @@ metadata:
   namespace: crossplane-system
 spec:
   baseURL: https://localai.example.com
+  # Hosts a Model configuration may reference in any http or https URL, such as
+  # a proxy upstream or a download. Models naming any other host are rejected.
+  allowedModelUpstreams:
+    - opencode.ai
   credentials:
     source: Secret
     secretRef:
