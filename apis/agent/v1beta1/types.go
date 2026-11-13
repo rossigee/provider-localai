@@ -1,6 +1,7 @@
 package v1beta1
 
 import (
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -135,4 +136,13 @@ type AgentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Agent `json:"items"`
+}
+
+// GetItems returns the Agent resources in the list.
+func (l *AgentList) GetItems() []resource.Managed {
+	out := make([]resource.Managed, 0, len(l.Items))
+	for i := range l.Items {
+		out = append(out, &l.Items[i])
+	}
+	return out
 }
