@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--poll-state-metric` flag was parsed, but no resource kinds were listed, so
   nothing was recorded.
 
+### Fixed
+
+- The `crossplane-runtime` replacement is pinned to
+  `github.com/rossigee/crossplane-runtime/v2` v2.5.0. The v2.5.1 version
+  recorded in `go.sum` is not a tag on that fork: `GOPROXY=direct` fails with
+  `unknown revision v2.5.1`, and it only resolves from the module proxy's
+  cache, so a build without proxy access cannot fetch it. v2.5.0 is the
+  newest tag the fork actually has.
+
 ## [0.3.1] - 2026-11-13
 
 ### Breaking

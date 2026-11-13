@@ -145,8 +145,8 @@ github.com/prometheus/common v0.73.1 h1:SZWh/j4AvhCdhX8jvYSnxvPxhWlC9QZkjJ+tOrEr
 github.com/prometheus/common v0.73.1/go.mod h1:I9aA/Ukz9s1olOobh8KtCkU7B1mQPQsB9UvQPsUQ1Dk=
 github.com/prometheus/procfs v0.23.0 h1:ad+S6FTkzwaMgacKLM5h6bNKExS+DMH0YiUwXItH/o4=
 github.com/prometheus/procfs v0.23.0/go.mod h1:3AVXO0FqLafyYFU/V/IQRZlC8Rgqz8Dm/x6pKLK+RIk=
-github.com/rossigee/crossplane-runtime/v2 v2.5.1 h1:SgFnC2+kDB21QwDiKMpi+fnBnn7m286UzBKjXfytzyE=
-github.com/rossigee/crossplane-runtime/v2 v2.5.1/go.mod h1:HydCb6kEfcRF2VtlVdWA8tCNghY7Ug+fVOmoQ+0ryzI=
+github.com/rossigee/crossplane-runtime/v2 v2.5.0 h1:vffoYZrJBxdFU2i1IBZQB+mDjsMPYya4WfuhuFInLAQ=
+github.com/rossigee/crossplane-runtime/v2 v2.5.0/go.mod h1:U9Wf0etSG2hKFSJKiIQK59IcXJcc3GF9JG/ELju6NEc=
 github.com/rossigee/localai-client v0.1.5 h1:/Vg49Lce/nYMXKVNzAFsyOwZQvHlfsdfWZeJ5ehDXC4=
 github.com/rossigee/localai-client v0.1.5/go.mod h1:s741LFjSgZnV/mI6yDZzPDTtrsg3/G/B9/xGzqf5ZuE=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
