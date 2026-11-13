@@ -91,7 +91,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI HTTP client")
 	}
-	return &external{client: laic, cfg: cfg, httpClient: rawClient}, nil
+	return &external{client: laic, cfg: cfg, httpClient: rawClient, allowedHosts: pc.Spec.AllowedModelUpstreams}, nil
 }
 
 // desiredModelConfig renders the configuration to POST to /models/import. The
@@ -141,6 +141,8 @@ type external struct {
 	client     *laiclient.Client
 	cfg        laiclient.Config
 	httpClient *http.Client
+	// allowedHosts is the ProviderConfig's spec.allowedModelUpstreams.
+	allowedHosts []string
 }
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
@@ -208,6 +210,9 @@ func (e *external) importModel(ctx context.Context, cr *modelv1beta1.Model) erro
 	desired, err := desiredModelConfig(cr)
 	if err != nil {
 		return errors.Wrap(err, errParseConfig)
+	}
+	if err := checkConfigURLs(desired, e.allowedHosts); err != nil {
+		return err
 	}
 	var res ImportModelResponse
 	if err := e.do(ctx, http.MethodPost, "/models/import", desired, &res); err != nil {

@@ -106,6 +106,21 @@ provider created the object, `adopted` when it was found already present.
 Resources that predate this field have no `ownership` value and are deleted
 with the object, as before.
 
+### Model upstreams
+
+A Model configuration can make LocalAI fetch URLs (`download_files`, URI-valued
+`model` or `mmproj`) and send requests to a proxy upstream (`proxy.upstream_url`).
+LocalAI would also use an environment variable named by `proxy.api_key_env`
+for those requests. A Model that could choose these destinations could send
+LocalAI's credentials to a host of its choosing.
+
+So the ProviderConfig lists the hosts a Model may use in
+`spec.allowedModelUpstreams`. Any `http` or `https` URL in a Model configuration
+must name a listed host, or the Model is rejected before LocalAI is called. An
+entry is a host, or `host:port` to require a port. The default is an empty list,
+which allows no URLs. The `examples/provider/config.yaml` lists `opencode.ai`
+for the example Model.
+
 ## Usage
 
 ```yaml

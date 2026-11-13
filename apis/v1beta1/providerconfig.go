@@ -30,6 +30,14 @@ type ProviderConfigSpec struct {
 	// RootCACertificateRef references a secret containing the CA certificate(s)
 	// to trust when connecting to LocalAI. If omitted, the system CA pool is used.
 	RootCACertificateRef *xpv1.SecretKeySelector `json:"rootCACertificateRef,omitempty"`
+
+	// AllowedModelUpstreams lists the hosts (host or host:port) that a Model
+	// configuration may reference in any http or https URL, such as a proxy
+	// upstream or a download. LocalAI fetches these URLs and sends requests to
+	// them, so a Model that names any other host is rejected. The default allows
+	// no hosts, which rejects Models that reference URLs.
+	// +optional
+	AllowedModelUpstreams []string `json:"allowedModelUpstreams,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.
