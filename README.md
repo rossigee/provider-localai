@@ -121,6 +121,25 @@ entry is a host, or `host:port` to require a port. The default is an empty list,
 which allows no URLs. The `examples/provider/config.yaml` lists `opencode.ai`
 for the example Model.
 
+### Runtime settings
+
+A Settings resource applies LocalAI runtime settings through `POST /api/settings`.
+`spec.forProvider.settings` is a JSON object. LocalAI merges it into its saved
+settings, so only the keys given change. `examples/settings.yaml` shows one.
+
+Only allow-listed keys are accepted. The list is in `internal/controller/settings`.
+It covers watchdog, VRAM, eviction, thread and context tuning, and `debug`.
+Keys that control authentication or cross-origin access (`api_keys`, `csrf`,
+`cors`, `cors_allow_origins`), make LocalAI fetch remote content (`galleries`,
+`autoload_*`), open a network (`p2p_*`, `federated`), or enable tools (`chats_*`)
+are rejected.
+
+The provider records a hash of the settings it last applied in
+`status.atProvider.appliedHash`. A change to `spec.forProvider.settings` posts
+the settings again. Settings changed directly in LocalAI are not detected,
+because the provider does not read settings back. Deleting the resource does
+not revert LocalAI's settings.
+
 ## Usage
 
 ```yaml

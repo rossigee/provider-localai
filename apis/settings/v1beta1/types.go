@@ -6,12 +6,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// SettingsParameters define the LocalAI runtime settings this resource applies.
 type SettingsParameters struct {
-	// +optional
-	BaseURL string `json:"baseURL,omitempty"`
+	// Settings is a JSON object of LocalAI runtime settings, such as
+	// {"watchdog_idle_timeout": "15m", "threads": 8}. It is posted to
+	// POST /api/settings, which LocalAI merges into its saved settings, so only
+	// the keys given here change. Only keys on the provider's allow-list are
+	// accepted; security-sensitive keys such as api_keys are rejected.
+	// +kubebuilder:validation:Required
+	Settings string `json:"settings"`
 }
 
-type SettingsObservation struct{}
+// SettingsObservation is the observed state of the applied settings.
+type SettingsObservation struct {
+	// AppliedHash is the sha256 of the canonical settings last posted to
+	// LocalAI. It changes when spec.forProvider.settings changes. The provider
+	// does not read settings back from LocalAI, so settings changed directly in
+	// LocalAI are not detected.
+	AppliedHash string `json:"appliedHash,omitempty"`
+}
 
 type SettingsSpec struct {
 	xpv1.ManagedResourceSpec `json:",inline"`
