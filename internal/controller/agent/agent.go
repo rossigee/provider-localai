@@ -2,10 +2,10 @@ package agent
 
 import (
 	"context"
-	"strings"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
@@ -27,7 +27,6 @@ const (
 	errCreateAgent      = "cannot create LocalAI agent"
 	errUpdateAgent      = "cannot update LocalAI agent"
 	errDeleteAgent      = "cannot delete LocalAI agent"
-	errInlineMCPToken   = "spec.forProvider.mcpServers[%d].token is no longer supported: move the token into a Secret and set tokenSecretRef"
 
 	controllerName = "agents.agent.localai.m.crossplane.io"
 )
@@ -71,155 +70,77 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI client")
 	}
-
-	creds, err := resolveCredentials(ctx, c.kube, cr)
-	if err != nil {
-		return nil, err
-	}
-	return &external{client: laic, creds: creds}, nil
-}
-
-// credentials are the secret values an agent is created with.
-type credentials struct {
-	// apiKey is the key the agent uses to call LocalAI's own API. Empty when
-	// no apiKeySecretRef is set.
-	apiKey string
-	// mcpTokens are index-aligned with spec.forProvider.mcpServers. An entry is
-	// empty when that server has no tokenSecretRef.
-	mcpTokens []string
-	// versions identifies the Secrets the values came from, as
-	// "namespace/name@resourceVersion" joined with commas. Kubernetes changes
-	// resourceVersion on every edit to a Secret, so a rotation changes this
-	// string. It records no secret material, so it is safe to keep in status.
-	versions string
-}
-
-// resolveCredentials reads every Secret the agent refers to.
-func resolveCredentials(ctx context.Context, kube client.Client, cr *agentv1beta1.Agent) (credentials, error) {
-	apiKey, apiKeyVersion, err := resolveSecretValue(ctx, kube, cr.GetNamespace(), cr.Spec.ForProvider.APIKeySecretRef, "apiKeySecretRef")
-	if err != nil {
-		return credentials{}, err
-	}
-	creds := credentials{apiKey: apiKey, mcpTokens: make([]string, 0, len(cr.Spec.ForProvider.MCPServers))}
-	versions := []string{}
-	if apiKeyVersion != "" {
-		versions = append(versions, apiKeyVersion)
-	}
-	for i, s := range cr.Spec.ForProvider.MCPServers {
-		if s.Token != "" {
-			return credentials{}, errors.Errorf(errInlineMCPToken, i)
-		}
-		t, v, err := resolveSecretValue(ctx, kube, cr.GetNamespace(), s.TokenSecretRef, "mcpServers.tokenSecretRef")
-		if err != nil {
-			return credentials{}, err
-		}
-		creds.mcpTokens = append(creds.mcpTokens, t)
-		if v != "" {
-			versions = append(versions, v)
-		}
-	}
-	creds.versions = strings.Join(versions, ",")
-	return creds, nil
-}
-
-// resolveSecretValue reads one key from a Secret that must live in the
-// Agent's namespace. It returns the value and the Secret's version. A nil ref
-// yields empty results.
-func resolveSecretValue(ctx context.Context, kube client.Client, agentNamespace string, ref *xpv1.SecretKeySelector, field string) (string, string, error) {
-	if ref == nil {
-		return "", "", nil
-	}
-	// The Secret must live beside the Agent. Otherwise any tenant that can create
-	// an Agent could copy a value from a namespace it cannot read.
-	if ref.Namespace != agentNamespace {
-		return "", "", errors.Errorf("%s must reference a Secret in the Agent's namespace %q; got %q", field, agentNamespace, ref.Namespace)
-	}
-	key := ref.Key
-	if key == "" {
-		key = "token"
-	}
-	secret := &corev1.Secret{}
-	if err := kube.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: ref.Namespace}, secret); err != nil {
-		return "", "", errors.Wrapf(err, "cannot get %s secret %s/%s", field, ref.Namespace, ref.Name)
-	}
-	raw, ok := secret.Data[key]
-	if !ok {
-		return "", "", errors.Errorf("key %q not found in secret %s/%s", key, ref.Namespace, ref.Name)
-	}
-	version := ref.Namespace + "/" + ref.Name + "@" + secret.ResourceVersion
-	return strings.TrimSpace(string(raw)), version, nil
+	return &external{client: laic}, nil
 }
 
 type external struct {
 	client *laiclient.Client
-	creds  credentials
 }
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
+// Observe looks the agent up by its external name, which is the LocalAI ID
+// recorded at creation. An agent without an external name does not exist yet.
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr := mg.(*agentv1beta1.Agent)
-	a, err := e.client.GetAgent(ctx, cr.Spec.ForProvider.Name)
+	id := meta.GetExternalName(cr)
+	if id == "" {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+	a, err := e.client.GetAgent(ctx, id)
 	if err != nil {
 		if laiclient.IsNotFound(err) {
 			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetAgent)
 	}
-	clients.RecordFirstObservation(&cr.Status.AtProvider.Ownership, cr.Status.AtProvider.Name)
-	cr.Status.AtProvider.Name = a.Name
+	cr.Status.AtProvider.ID = a.ID
 	cr.Status.SetConditions(xpv1.Available())
-
-	if cr.Status.AtProvider.SecretVersions == "" {
-		// First observation: record the baseline without rewriting the agent,
-		// so existing agents are adopted rather than overwritten.
-		cr.Status.AtProvider.SecretVersions = e.creds.versions
-	}
-	credsCurrent := cr.Status.AtProvider.SecretVersions == e.creds.versions
 	return managed.ExternalObservation{
 		ResourceExists:   true,
-		ResourceUpToDate: agentUpToDate(cr, a) && credsCurrent,
+		ResourceUpToDate: agentUpToDate(cr, a),
 	}, nil
 }
 
-// agentUpToDate compares the desired agent against what LocalAI reports, so
-// edits to any field are pushed rather than only model changes. Credentials
-// are compared through their digest in status, not against LocalAI, because
-// LocalAI may not return them.
+// agentUpToDate compares every desired field with what LocalAI reports, so an
+// edit to any field is pushed on the next reconcile.
 func agentUpToDate(cr *agentv1beta1.Agent, a *laiclient.Agent) bool {
 	p := cr.Spec.ForProvider
-	if a.Model != p.Model || a.Description != p.Description || a.SystemPrompt != p.SystemPrompt {
+	if a.Name != p.Name || a.Description != p.Description || a.Instructions != p.Instructions || a.Model != p.Model {
 		return false
 	}
-	// Skills are deliberately not compared. LocalAI builds whose agent API has
-	// no selected_skills field drop it on write, so comparing it would report
-	// drift forever and rewrite the agent on every poll.
-	if !equalStrings(a.AllowedTools, p.AllowedTools) || !equalStrings(a.ExcludedTools, p.ExcludedTools) {
+	if networkOf(a.Network) != networkOf(p.Network) {
 		return false
 	}
-	if p.EnableSkills != nil && (a.EnableSkills == nil || *a.EnableSkills != *p.EnableSkills) {
+	if !equalStrings(a.Skills, p.Skills) || !equalStrings(a.Collections, p.Collections) ||
+		!equalStrings(a.MCPServers, p.MCPServers) || !equalStrings(a.Addons, p.Addons) {
 		return false
 	}
-	if p.EnableKB != nil && (a.EnableKB == nil || *a.EnableKB != *p.EnableKB) {
-		return false
-	}
-	if p.KbAsTools != nil && (a.KbAsTools == nil || *a.KbAsTools != *p.KbAsTools) {
-		return false
-	}
-	if p.LongTermMemory != nil && (a.LongTermMemory == nil || *a.LongTermMemory != *p.LongTermMemory) {
-		return false
-	}
-	if len(a.MCPServers) != len(p.MCPServers) {
-		return false
-	}
-	for i, s := range p.MCPServers {
-		if a.MCPServers[i].URL != s.URL {
-			return false
-		}
-	}
-	return true
+	return folderUpToDate(p.Folder, a.Folder)
 }
 
+// networkOf is the network preset LocalAI applies when none is set.
+func networkOf(n string) string {
+	if n == "" {
+		return "off"
+	}
+	return n
+}
+
+// folderUpToDate compares the desired folder with the one LocalAI reports. The
+// mode is compared only when the spec sets one, because LocalAI picks a default.
+func folderUpToDate(want *agentv1beta1.AgentFolder, got *laiclient.AgentFolder) bool {
+	if want == nil {
+		return got == nil
+	}
+	if got == nil || got.Path != want.Path {
+		return false
+	}
+	return want.Mode == "" || got.Mode == want.Mode
+}
+
+// equalStrings compares two lists as ordered lists, treating nil and empty as
+// the same.
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -232,79 +153,57 @@ func equalStrings(a, b []string) bool {
 	return true
 }
 
-func agentFromCR(cr *agentv1beta1.Agent, creds credentials) laiclient.Agent {
+// agentWrite builds the body LocalAI expects from the spec.
+func agentWrite(cr *agentv1beta1.Agent) laiclient.AgentWrite {
 	p := cr.Spec.ForProvider
-	out := laiclient.Agent{
-		Name:           p.Name,
-		Model:          p.Model,
-		Description:    p.Description,
-		SystemPrompt:   p.SystemPrompt,
-		SelectedSkills: p.Skills,
-		EnableSkills:   p.EnableSkills,
-		EnableKB:       p.EnableKB,
-		KbAsTools:      p.KbAsTools,
-		LongTermMemory: p.LongTermMemory,
-		AllowedTools:   p.AllowedTools,
-		ExcludedTools:  p.ExcludedTools,
-		APIKey:         creds.apiKey,
+	out := laiclient.AgentWrite{
+		Name:         p.Name,
+		Description:  p.Description,
+		Instructions: p.Instructions,
+		Model:        p.Model,
+		MCPServers:   p.MCPServers,
+		Addons:       p.Addons,
+		Collections:  p.Collections,
+		Skills:       p.Skills,
+		Network:      p.Network,
 	}
-	for i, s := range p.MCPServers {
-		out.MCPServers = append(out.MCPServers, laiclient.MCPServer{
-			URL:   s.URL,
-			Token: creds.mcpTokens[i],
-		})
+	if p.Folder != nil {
+		out.Folder = &laiclient.AgentFolderWrite{Path: p.Folder.Path, Mode: p.Folder.Mode}
 	}
 	return out
 }
 
+// Create saves the agent and records its LocalAI ID as the external name.
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*agentv1beta1.Agent)
-	_, err := e.client.CreateAgent(ctx, agentFromCR(cr, e.creds))
+	a, err := e.client.CreateAgent(ctx, agentWrite(cr))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
 	}
-	cr.Status.AtProvider.SecretVersions = e.creds.versions
-	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
+	meta.SetExternalName(cr, a.ID)
+	cr.Status.AtProvider.ID = a.ID
 	return managed.ExternalCreation{}, nil
 }
 
+// Update replaces the saved agent. LocalAI's update replaces the whole agent,
+// so the full desired state is sent.
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*agentv1beta1.Agent)
-	desired := agentFromCR(cr, e.creds)
-	// Preserve KB/memory settings that are not managed by the CR. LocalAI
-	// treats omitted fields as "reset to default", so we fetch the current
-	// config and carry over any KB/memory values the CR does not set.
-	current, err := e.client.GetAgent(ctx, cr.Spec.ForProvider.Name)
-	if err != nil && !laiclient.IsNotFound(err) {
-		// Updating without the current settings would reset them.
-		return managed.ExternalUpdate{}, errors.Wrap(err, errGetAgent)
-	}
-	if err == nil {
-		if desired.EnableKB == nil {
-			desired.EnableKB = current.EnableKB
-		}
-		if desired.KbAsTools == nil {
-			desired.KbAsTools = current.KbAsTools
-		}
-		if desired.LongTermMemory == nil {
-			desired.LongTermMemory = current.LongTermMemory
-		}
-	}
-	_, err = e.client.UpdateAgent(ctx, cr.Spec.ForProvider.Name, desired)
-	if err != nil {
+	if _, err := e.client.UpdateAgent(ctx, meta.GetExternalName(cr), agentWrite(cr)); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
 	}
-	cr.Status.AtProvider.SecretVersions = e.creds.versions
 	return managed.ExternalUpdate{}, nil
 }
 
+// Delete removes the saved agent. An agent that is already gone is not an
+// error.
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr := mg.(*agentv1beta1.Agent)
-	if !clients.DeletesExternal(cr.Status.AtProvider.Ownership) {
-		// The agent was already in LocalAI and is not ours to remove.
+	id := meta.GetExternalName(cr)
+	if id == "" {
 		return managed.ExternalDelete{}, nil
 	}
-	if err := e.client.DeleteAgent(ctx, cr.Spec.ForProvider.Name); err != nil {
+	if err := e.client.DeleteAgent(ctx, id); err != nil && !laiclient.IsNotFound(err) {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteAgent)
 	}
 	return managed.ExternalDelete{}, nil

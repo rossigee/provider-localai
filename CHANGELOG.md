@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- Agents and skills use the chats API (`/api/chats/agents`, `/api/chats/skills`).
+  The `/api/agents` endpoints this provider used no longer exist in LocalAI.
+- An Agent is identified by its LocalAI ID, recorded as the external name. The
+  provider no longer looks an agent up by name.
+- Agent fields: `systemPrompt` is now `instructions`; `mcpServers` is a list of
+  server names; `collections`, `addons` and `network` are added; `folder` is
+  added. `enableKB`, `kbAsTools`, `longTermMemory`, `enableSkills`,
+  `allowedTools`, `excludedTools`, `apiKeySecretRef` and the MCP `url` and
+  `tokenSecretRef` fields are removed. The chats API has no equivalent for them.
+- Skills are identified by `layer` (`personal` or `shared`) and `name`. The
+  `layer` field is required.
+- Deleting an Agent or Skill deletes the LocalAI object. An object already gone
+  is not an error.
+
 ## [0.4.0] - 2026-11-14
 
 ### Added

@@ -6,123 +6,88 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MCPServerSpec is a remote MCP server the agent may use.
-type MCPServerSpec struct {
-	// URL of the MCP Streamable HTTP / SSE endpoint.
-	// +kubebuilder:validation:Required
-	URL string `json:"url"`
+// AgentFolder chooses the folder a saved agent works in. Omit it for an agent
+// that works on all the user's files.
+type AgentFolder struct {
+	// Path is the folder the agent works in.
+	Path string `json:"path"`
 
-	// TokenSecretRef references a Secret key holding the optional bearer token
-	// for this server. The Secret must be in the Agent's namespace.
+	// Mode is the folder access mode LocalAI applies when it is set.
 	// +optional
-	TokenSecretRef *xpv1.SecretKeySelector `json:"tokenSecretRef,omitempty"`
-
-	// Token is no longer supported. It was a plaintext bearer token in the CR
-	// spec. Setting it makes the Agent fail to connect; move the value into a
-	// Secret and set tokenSecretRef.
-	// Deprecated: use tokenSecretRef.
-	// +optional
-	Token string `json:"token,omitempty"`
+	Mode string `json:"mode,omitempty"`
 }
 
-// AgentParameters define the desired state of a LocalAI Agent.
+// AgentParameters are the desired settings of a saved LocalAI agent.
 type AgentParameters struct {
-	// Name of the agent in LocalAI.
-	// +kubebuilder:validation:Required
+	// Name is the agent's display name.
 	Name string `json:"name"`
 
-	// Model to use for this agent.
-	// +kubebuilder:validation:Required
-	Model string `json:"model"`
-
-	// Description of the agent.
+	// Description is a short description of the agent.
 	// +optional
 	Description string `json:"description,omitempty"`
 
-	// SystemPrompt is the system prompt for the agent.
+	// Instructions is the system prompt the agent runs with.
 	// +optional
-	SystemPrompt string `json:"systemPrompt,omitempty"`
+	Instructions string `json:"instructions,omitempty"`
 
-	// Skills is the list of skill names available to the agent. It is sent as
-	// selected_skills. LocalAI builds whose agent API has no selected_skills
-	// field drop it on write, which leaves every skill available, so it is not
-	// part of the drift comparison.
+	// Model is the LocalAI model the agent uses.
+	// +optional
+	Model string `json:"model,omitempty"`
+
+	// Skills lists the names of the skills the agent may use.
 	// +optional
 	Skills []string `json:"skills,omitempty"`
 
-	// EnableSkills turns on the LocalAGI skills service for this agent.
+	// Collections lists the names of the knowledge-base collections the agent
+	// searches.
 	// +optional
-	EnableSkills *bool `json:"enableSkills,omitempty"`
+	Collections []string `json:"collections,omitempty"`
 
-	// MCPServers is the per-agent MCP allowlist. Agents do not inherit
-	// model-level mcp.remote from LocalAI model configs.
+	// MCPServers lists the names of the MCP servers the agent may use, as they
+	// are configured in the model's MCP configuration.
 	// +optional
-	MCPServers []MCPServerSpec `json:"mcpServers,omitempty"`
+	MCPServers []string `json:"mcpServers,omitempty"`
 
-	// AllowedTools, when set, is the only tool names offered to the model.
+	// Addons lists the IDs of the add-ons the agent may use.
 	// +optional
-	AllowedTools []string `json:"allowedTools,omitempty"`
+	Addons []string `json:"addons,omitempty"`
 
-	// ExcludedTools are never offered, even if also listed in AllowedTools.
+	// Network is LocalAI's network preset for the agent. Empty means off.
 	// +optional
-	ExcludedTools []string `json:"excludedTools,omitempty"`
+	Network string `json:"network,omitempty"`
 
-	// EnableKB turns on the knowledge base for this agent.
+	// Folder chooses the folder the agent works in.
 	// +optional
-	EnableKB *bool `json:"enableKB,omitempty"`
-
-	// KbAsTools exposes the knowledge base as MCP tools.
-	// +optional
-	KbAsTools *bool `json:"kbAsTools,omitempty"`
-
-	// LongTermMemory enables long-term memory (notes) for this agent.
-	// +optional
-	LongTermMemory *bool `json:"longTermMemory,omitempty"`
-
-	// APIKeySecretRef references a Secret key holding the LocalAI API key the
-	// agent uses to call LocalAI's own API. Required when LocalAI has
-	// authentication enabled: LocalAI only generates a per-user agent key for
-	// callers that have a row in the users table, and a provider authenticating
-	// with a static API key has none, so creation would otherwise fail with a
-	// user_api_keys foreign key violation.
-	// +optional
-	APIKeySecretRef *xpv1.SecretKeySelector `json:"apiKeySecretRef,omitempty"`
+	Folder *AgentFolder `json:"folder,omitempty"`
 }
 
-// AgentObservation is the observed state of a LocalAI Agent.
+// AgentObservation is the state LocalAI reports for the agent.
 type AgentObservation struct {
-	// Name of the agent.
-	Name string `json:"name,omitempty"`
-
-	// Ownership is "created" when this provider created the agent in LocalAI,
-	// or "adopted" when it was already there on first observation. Deleting the
-	// resource deletes the agent only when it is not adopted.
-	Ownership string `json:"ownership,omitempty"`
-
-	// SecretVersions records the Secrets the API key and MCP tokens were last
-	// written from, as "namespace/name@resourceVersion" entries joined with
-	// commas. It contains no secret values. A change in any referenced Secret
-	// triggers an update.
-	SecretVersions string `json:"secretVersions,omitempty"`
+	// ID is the LocalAI identifier of the agent. It is also the agent's
+	// external name.
+	ID string `json:"id,omitempty"`
 }
 
-// AgentSpec defines the desired state of an Agent.
+// AgentSpec is the desired state of an Agent.
 type AgentSpec struct {
 	xpv1.ManagedResourceSpec `json:",inline"`
 	ForProvider              AgentParameters `json:"forProvider"`
 }
 
-// AgentStatus defines the observed state of an Agent.
+// AgentStatus is the observed state of an Agent.
 type AgentStatus struct {
 	xpv1.ManagedResourceStatus `json:",inline"`
 	AtProvider                 AgentObservation `json:"atProvider,omitempty"`
 }
 
+// An Agent is a saved LocalAI agent, owned by the service user behind the
+// ProviderConfig's API key.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,categories={crossplane,managed,localai}
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
+// +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 type Agent struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -131,6 +96,7 @@ type Agent struct {
 	Status            AgentStatus `json:"status,omitempty"`
 }
 
+// AgentList contains a list of Agents.
 // +kubebuilder:object:root=true
 type AgentList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -138,7 +104,7 @@ type AgentList struct {
 	Items           []Agent `json:"items"`
 }
 
-// GetItems returns the Agent resources in the list.
+// GetItems returns the Agents as managed resources.
 func (l *AgentList) GetItems() []resource.Managed {
 	out := make([]resource.Managed, 0, len(l.Items))
 	for i := range l.Items {

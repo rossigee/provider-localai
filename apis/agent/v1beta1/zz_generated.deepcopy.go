@@ -73,7 +73,14 @@ func (in *AgentList) DeepCopyObject() runtime.Object {
 
 func (in *AgentSpec) DeepCopyInto(out *AgentSpec) {
 	*out = *in
-	in.ForProvider.Skills = append([]string{}, in.ForProvider.Skills...)
+	out.ForProvider.Skills = append([]string(nil), in.ForProvider.Skills...)
+	out.ForProvider.Collections = append([]string(nil), in.ForProvider.Collections...)
+	out.ForProvider.MCPServers = append([]string(nil), in.ForProvider.MCPServers...)
+	out.ForProvider.Addons = append([]string(nil), in.ForProvider.Addons...)
+	if in.ForProvider.Folder != nil {
+		folder := *in.ForProvider.Folder
+		out.ForProvider.Folder = &folder
+	}
 }
 
 func (in *AgentStatus) DeepCopyInto(out *AgentStatus) {

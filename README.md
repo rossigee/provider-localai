@@ -90,21 +90,17 @@ ProviderConfig beside it; the provider does not fall back to
 
 Every Secret a ProviderConfig references (`credentials.secretRef`,
 `rootCACertificateRef`, `clientSecretRef`) must be in the ProviderConfig's
-namespace. An Agent's `apiKeySecretRef` must be in the Agent's namespace. A
-reference to any other namespace is rejected, so a tenant cannot make the
-provider read a Secret it could not read itself.
+namespace. A reference to any other namespace is rejected, so a tenant cannot
+make the provider read a Secret it could not read itself.
 
-### Adoption and deletion
+### Identity and deletion
 
-An Agent, Model or Skill that finds an object of the same name already in
-LocalAI on first observation adopts it. The resource then updates the object
-to match its spec, as before. Deleting an adopted resource leaves the LocalAI
-object in place, so a resource cannot remove something it did not create. The
-resource records this in `status.atProvider.ownership`: `created` when this
-provider created the object, `adopted` when it was found already present.
-
-Resources that predate this field have no `ownership` value and are deleted
-with the object, as before.
+Agents, skills and models are owned by the service user behind the
+ProviderConfig's API key. A resource only manages what it creates. An Agent
+records its LocalAI ID as the `crossplane.io/external-name` annotation and
+uses that ID for every later call. A Skill is identified by its `layer` and
+`name`. Deleting the resource deletes the LocalAI object; an object that is
+already gone is not an error.
 
 ### Model upstreams
 
@@ -153,57 +149,44 @@ spec:
     name: bookkeeping
     model: qwen3-8b
     description: Bookkeeping via Odoo MCP only.
-    systemPrompt: |
+    instructions: |
       You keep the books. Use only the Odoo MCP tools.
-    enableSkills: true
     skills:
       - example-bookkeeping
+    collections:
+      - books
     mcpServers:
-      - url: http://odoo-mcp.localai.svc.cluster.local:8080/stream
-    apiKeySecretRef:
-      namespace: crossplane-system
-      name: localai-provider-credentials
-      key: token
+      - odoo
+    network: off
   providerConfigRef:
     name: localai
 ```
 
-`apiKeySecretRef` is required when LocalAI has authentication enabled. LocalAI
-only mints a per-agent key for callers that have a row in its `users` table,
-and a provider using a static API key has none, so creation would otherwise
-fail with `fk_user_api_keys_user`. Supplying the key skips minting.
+The agent's name is the LocalAI name. `skills`, `collections` and `mcpServers`
+are lists of those names, and `addons` takes add-on IDs. MCP servers are named
+as they are configured in the model's MCP configuration, so no URL or token
+is set on the agent.
 
-Agents do not inherit model-level `mcp.remote` settings; list MCP servers per
-agent.
+Changes to any field are pushed on the next reconcile. A folder is set with
+`folder.path` and an optional `folder.mode`.
 
-MCP bearer tokens and the agent API key are read from Secrets, never from the
-CR spec. An MCP server takes `tokenSecretRef`, and the Secret must be in the
-Agent's namespace. The inline `token` field is no longer accepted: an Agent
-that sets it fails to connect until the value is moved into a Secret.
-
-The provider records each referenced Secret's name and `resourceVersion` in
-`status.atProvider.secretVersions`. It stores no secret values. Kubernetes
-changes `resourceVersion` on every edit to a Secret, so when a referenced
-Secret is rotated, the agent is updated. An edit to another key in the same
-Secret also triggers one update. The first observation of an existing agent
-records the versions without rewriting the agent.
+Agents and skills belong to the user behind the API key. Use an API key issued
+to a dedicated service user so provider-managed agents stay separate from
+people's own agents.
 
 ### Skills
 
-`spec.forProvider.skills` is sent as `selected_skills`. LocalAI builds that bind
-LocalAGI's `state.AgentConfig` have no such field and drop it on write, which
-leaves every skill available to the agent. Because the value cannot be read
-back, `skills` is excluded from the drift comparison; it is still sent, so a
-LocalAI build that persists it gets it.
+A skill is identified by `layer` (`personal` or `shared`) and `name`. Its
+`content` is sent as the skill body. `Observe` compares the description and
+body, so an edit is pushed on the next reconcile.
 
 ### Behaviour
 
-- `Observe` reads `/api/agents/{name}/config`. The plain agent endpoint only
-  reports whether an agent is active.
-- A 404 deletes/creates; any other API error is surfaced as a reconcile error
-  rather than treated as absence.
-- The whole desired agent (model, description, system prompt, tools, MCP
-  servers) is compared, so edits converge instead of being ignored.
+- Agents are read at `/api/chats/agents/{id}`; skills at
+  `/api/chats/skills/{layer}/{name}`.
+- A 404 means the object is absent; any other API error is surfaced as a
+  reconcile error rather than treated as absence.
+- An Agent whose external name is empty does not exist yet and is created.
 
 ### Model
 
@@ -236,7 +219,7 @@ LocalAI build that persists it gets it.
 
 | Resource | API Group | Description |
 |----------|-----------|-------------|
-| Agent | `agent.localai.m.crossplane.io/v1beta1` | LocalAI agents, with model, system prompt, skills and MCP servers |
+| Agent | `agent.localai.m.crossplane.io/v1beta1` | LocalAI agents, with model, instructions, skills, collections and MCP servers |
 | Skill | `skill.localai.m.crossplane.io/v1beta1` | Skills available to agents |
 | Model | `model.localai.m.crossplane.io/v1beta1` | Models available to the LocalAI deployment |
 | Settings | `settings.localai.m.crossplane.io/v1beta1` | LocalAI instance settings |
