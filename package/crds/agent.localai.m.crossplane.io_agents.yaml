@@ -25,12 +25,18 @@ spec:
     - jsonPath: .status.conditions[?(@.type=='Synced')].status
       name: SYNCED
       type: string
+    - jsonPath: .metadata.annotations.crossplane\.io/external-name
+      name: EXTERNAL-NAME
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
     name: v1beta1
     schema:
       openAPIV3Schema:
+        description: |-
+          An Agent is a saved LocalAI agent, owned by the service user behind the
+          ProviderConfig's API key.
         properties:
           apiVersion:
             description: |-
@@ -50,125 +56,69 @@ spec:
           metadata:
             type: object
           spec:
-            description: AgentSpec defines the desired state of an Agent.
+            description: AgentSpec is the desired state of an Agent.
             properties:
               forProvider:
-                description: AgentParameters define the desired state of a LocalAI
-                  Agent.
+                description: AgentParameters are the desired settings of a saved LocalAI
+                  agent.
                 properties:
-                  allowedTools:
-                    description: AllowedTools, when set, is the only tool names offered
-                      to the model.
+                  addons:
+                    description: Addons lists the IDs of the add-ons the agent may
+                      use.
                     items:
                       type: string
                     type: array
-                  apiKeySecretRef:
+                  collections:
                     description: |-
-                      APIKeySecretRef references a Secret key holding the LocalAI API key the
-                      agent uses to call LocalAI's own API. Required when LocalAI has
-                      authentication enabled: LocalAI only generates a per-user agent key for
-                      callers that have a row in the users table, and a provider authenticating
-                      with a static API key has none, so creation would otherwise fail with a
-                      user_api_keys foreign key violation.
+                      Collections lists the names of the knowledge-base collections the agent
+                      searches.
+                    items:
+                      type: string
+                    type: array
+                  description:
+                    description: Description is a short description of the agent.
+                    type: string
+                  folder:
+                    description: Folder chooses the folder the agent works in.
                     properties:
-                      key:
-                        description: The key to select.
+                      mode:
+                        description: Mode is the folder access mode LocalAI applies
+                          when it is set.
                         type: string
-                      name:
-                        description: Name of the secret.
-                        type: string
-                      namespace:
-                        description: Namespace of the secret.
+                      path:
+                        description: Path is the folder the agent works in.
                         type: string
                     required:
-                    - key
-                    - name
-                    - namespace
+                    - path
                     type: object
-                  description:
-                    description: Description of the agent.
+                  instructions:
+                    description: Instructions is the system prompt the agent runs
+                      with.
                     type: string
-                  enableKB:
-                    description: EnableKB turns on the knowledge base for this agent.
-                    type: boolean
-                  enableSkills:
-                    description: EnableSkills turns on the LocalAGI skills service
-                      for this agent.
-                    type: boolean
-                  excludedTools:
-                    description: ExcludedTools are never offered, even if also listed
-                      in AllowedTools.
-                    items:
-                      type: string
-                    type: array
-                  kbAsTools:
-                    description: KbAsTools exposes the knowledge base as MCP tools.
-                    type: boolean
-                  longTermMemory:
-                    description: LongTermMemory enables long-term memory (notes) for
-                      this agent.
-                    type: boolean
                   mcpServers:
                     description: |-
-                      MCPServers is the per-agent MCP allowlist. Agents do not inherit
-                      model-level mcp.remote from LocalAI model configs.
-                    items:
-                      description: MCPServerSpec is a remote MCP server the agent
-                        may use.
-                      properties:
-                        token:
-                          description: |-
-                            Token is no longer supported. It was a plaintext bearer token in the CR
-                            spec. Setting it makes the Agent fail to connect; move the value into a
-                            Secret and set tokenSecretRef.
-                            Deprecated: use tokenSecretRef.
-                          type: string
-                        tokenSecretRef:
-                          description: |-
-                            TokenSecretRef references a Secret key holding the optional bearer token
-                            for this server. The Secret must be in the Agent's namespace.
-                          properties:
-                            key:
-                              description: The key to select.
-                              type: string
-                            name:
-                              description: Name of the secret.
-                              type: string
-                            namespace:
-                              description: Namespace of the secret.
-                              type: string
-                          required:
-                          - key
-                          - name
-                          - namespace
-                          type: object
-                        url:
-                          description: URL of the MCP Streamable HTTP / SSE endpoint.
-                          type: string
-                      required:
-                      - url
-                      type: object
-                    type: array
-                  model:
-                    description: Model to use for this agent.
-                    type: string
-                  name:
-                    description: Name of the agent in LocalAI.
-                    type: string
-                  skills:
-                    description: |-
-                      Skills is the list of skill names available to the agent. It is sent as
-                      selected_skills. LocalAI builds whose agent API has no selected_skills
-                      field drop it on write, which leaves every skill available, so it is not
-                      part of the drift comparison.
+                      MCPServers lists the names of the MCP servers the agent may use, as they
+                      are configured in the model's MCP configuration.
                     items:
                       type: string
                     type: array
-                  systemPrompt:
-                    description: SystemPrompt is the system prompt for the agent.
+                  model:
+                    description: Model is the LocalAI model the agent uses.
                     type: string
+                  name:
+                    description: Name is the agent's display name.
+                    type: string
+                  network:
+                    description: Network is LocalAI's network preset for the agent.
+                      Empty means off.
+                    type: string
+                  skills:
+                    description: Skills lists the names of the skills the agent may
+                      use.
+                    items:
+                      type: string
+                    type: array
                 required:
-                - model
                 - name
                 type: object
               managementPolicies:
@@ -230,26 +180,16 @@ spec:
             - forProvider
             type: object
           status:
-            description: AgentStatus defines the observed state of an Agent.
+            description: AgentStatus is the observed state of an Agent.
             properties:
               atProvider:
-                description: AgentObservation is the observed state of a LocalAI Agent.
+                description: AgentObservation is the state LocalAI reports for the
+                  agent.
                 properties:
-                  name:
-                    description: Name of the agent.
-                    type: string
-                  ownership:
+                  id:
                     description: |-
-                      Ownership is "created" when this provider created the agent in LocalAI,
-                      or "adopted" when it was already there on first observation. Deleting the
-                      resource deletes the agent only when it is not adopted.
-                    type: string
-                  secretVersions:
-                    description: |-
-                      SecretVersions records the Secrets the API key and MCP tokens were last
-                      written from, as "namespace/name@resourceVersion" entries joined with
-                      commas. It contains no secret values. A change in any referenced Secret
-                      triggers an update.
+                      ID is the LocalAI identifier of the agent. It is also the agent's
+                      external name.
                     type: string
                 type: object
               conditions:

@@ -18,9 +18,22 @@ spec:
     singular: skill
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
     schema:
       openAPIV3Schema:
+        description: |-
+          A Skill is a LocalAI skill, owned by the service user behind the
+          ProviderConfig's API key.
         properties:
           apiVersion:
             description: |-
@@ -40,24 +53,33 @@ spec:
           metadata:
             type: object
           spec:
-            description: SkillSpec defines the desired state.
+            description: SkillSpec is the desired state of a Skill.
             properties:
               forProvider:
-                description: SkillParameters define the desired state of a LocalAI
-                  Skill.
+                description: |-
+                  SkillParameters are the desired settings of a LocalAI skill. A skill is
+                  identified by its layer and name.
                 properties:
                   content:
-                    description: Content is the skill's instructions, sent to LocalAI
-                      as content.
+                    description: Content is the skill's text, its instructions.
                     type: string
                   description:
-                    description: Description of the skill.
+                    description: Description is a short description of the skill.
+                    type: string
+                  layer:
+                    description: |-
+                      Layer is the skill layer: personal skills belong to the service user,
+                      shared skills are visible to every user.
+                    enum:
+                    - personal
+                    - shared
                     type: string
                   name:
-                    description: Name of the skill in LocalAI.
+                    description: Name is the skill's name.
                     type: string
                 required:
                 - content
+                - layer
                 - name
                 type: object
               managementPolicies:
@@ -119,18 +141,17 @@ spec:
             - forProvider
             type: object
           status:
-            description: SkillStatus defines the observed state.
+            description: SkillStatus is the observed state of a Skill.
             properties:
               atProvider:
-                description: SkillObservation is the observed state.
+                description: SkillObservation is the state LocalAI reports for the
+                  skill.
                 properties:
-                  name:
+                  layer:
+                    description: Layer is the layer the skill is stored in.
                     type: string
-                  ownership:
-                    description: |-
-                      Ownership is "created" when this provider created the skill in LocalAI,
-                      or "adopted" when it was already there on first observation. Deleting the
-                      resource deletes the skill only when it is not adopted.
+                  name:
+                    description: Name is the skill's name as LocalAI reports it.
                     type: string
                 type: object
               conditions:

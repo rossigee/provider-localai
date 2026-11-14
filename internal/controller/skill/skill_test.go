@@ -11,13 +11,16 @@ import (
 
 	laiclient "github.com/rossigee/localai-client/client"
 	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
-	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 func skillCR(name string) *skillv1beta1.Skill {
 	return &skillv1beta1.Skill{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "tenant-a", Name: name},
-		Spec:       skillv1beta1.SkillSpec{ForProvider: skillv1beta1.SkillParameters{Name: name, Content: "c"}},
+		Spec: skillv1beta1.SkillSpec{ForProvider: skillv1beta1.SkillParameters{
+			Layer:   "personal",
+			Name:    name,
+			Content: "c",
+		}},
 	}
 }
 
@@ -32,33 +35,70 @@ func skillExternal(t *testing.T, h http.HandlerFunc) *external {
 	return &external{client: c}
 }
 
-func TestDeleteKeepsAdoptedSkill(t *testing.T) {
-	var writes int
+func TestObserveLooksUpByLayerAndName(t *testing.T) {
 	e := skillExternal(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			writes++
+		if r.URL.Path != "/api/chats/skills/personal/research" {
+			t.Errorf("path = %s, want /api/chats/skills/personal/research", r.URL.Path)
 		}
-		_, _ = io.WriteString(w, `{}`)
+		_, _ = io.WriteString(w, `{"name":"research","layer":"personal","description":"","body":"c","editable":true}`)
 	})
-	cr := skillCR("research")
-	cr.Status.AtProvider.Ownership = clients.OwnershipAdopted
-	if _, err := e.Delete(context.Background(), cr); err != nil {
-		t.Fatalf("Delete: %v", err)
+	obs, err := e.Observe(context.Background(), skillCR("research"))
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
 	}
-	if writes != 0 {
-		t.Errorf("Delete sent %d write request(s) for an adopted skill, want 0", writes)
+	if !obs.ResourceExists || !obs.ResourceUpToDate {
+		t.Errorf("observation = %+v, want existing and up to date", obs)
 	}
 }
 
-func TestObserveMarksPreExistingSkillAdopted(t *testing.T) {
+func TestObserveDetectsBodyDrift(t *testing.T) {
 	e := skillExternal(t, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, `{"name":"research","content":"c"}`)
+		_, _ = io.WriteString(w, `{"name":"research","layer":"personal","description":"","body":"old","editable":true}`)
 	})
-	cr := skillCR("research")
-	if _, err := e.Observe(context.Background(), cr); err != nil {
+	obs, err := e.Observe(context.Background(), skillCR("research"))
+	if err != nil {
 		t.Fatalf("Observe: %v", err)
 	}
-	if cr.Status.AtProvider.Ownership != clients.OwnershipAdopted {
-		t.Errorf("ownership = %q, want adopted", cr.Status.AtProvider.Ownership)
+	if !obs.ResourceExists || obs.ResourceUpToDate {
+		t.Errorf("observation = %+v, want existing but not up to date", obs)
+	}
+}
+
+func TestObserveMissingSkillDoesNotExist(t *testing.T) {
+	e := skillExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, `{"error":"not found"}`)
+	})
+	obs, err := e.Observe(context.Background(), skillCR("research"))
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if obs.ResourceExists {
+		t.Errorf("ResourceExists = true, want false for a 404")
+	}
+}
+
+func TestUpdatePutsToLayerAndName(t *testing.T) {
+	e := skillExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/api/chats/skills/personal/research" {
+			t.Errorf("request = %s %s, want PUT /api/chats/skills/personal/research", r.Method, r.URL.Path)
+		}
+		_, _ = io.WriteString(w, `{"name":"research","layer":"personal","description":"","body":"c","editable":true}`)
+	})
+	if _, err := e.Update(context.Background(), skillCR("research")); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+}
+
+func TestDeleteToleratesMissingSkill(t *testing.T) {
+	e := skillExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/api/chats/skills/personal/research" {
+			t.Errorf("request = %s %s, want DELETE /api/chats/skills/personal/research", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, `{"error":"not found"}`)
+	})
+	if _, err := e.Delete(context.Background(), skillCR("research")); err != nil {
+		t.Fatalf("Delete of an already-gone skill returned %v, want nil", err)
 	}
 }

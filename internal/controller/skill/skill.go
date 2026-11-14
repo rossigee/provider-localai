@@ -29,6 +29,7 @@ const (
 	controllerName = "skills.skill.localai.m.crossplane.io"
 )
 
+// Setup registers the Skill controller.
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	opts := append(shared.ReconcilerOptions(o, "Skill"),
 		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
@@ -74,56 +75,57 @@ type external struct{ client *laiclient.Client }
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
+// Observe looks the skill up by its layer and name.
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr := mg.(*skillv1beta1.Skill)
-	s, err := e.client.GetSkill(ctx, cr.Spec.ForProvider.Name)
+	p := cr.Spec.ForProvider
+	s, err := e.client.GetSkill(ctx, p.Layer, p.Name)
 	if err != nil {
 		if laiclient.IsNotFound(err) {
 			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetSkill)
 	}
-	clients.RecordFirstObservation(&cr.Status.AtProvider.Ownership, cr.Status.AtProvider.Name)
+	cr.Status.AtProvider.Layer = s.Layer
 	cr.Status.AtProvider.Name = s.Name
 	cr.Status.SetConditions(xpv1.Available())
-	upToDate := s.Content == cr.Spec.ForProvider.Content && s.Description == cr.Spec.ForProvider.Description
+	upToDate := s.Body == p.Content && s.Description == p.Description
 	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: upToDate}, nil
 }
 
+// Create saves the skill in its layer.
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*skillv1beta1.Skill)
-	_, err := e.client.CreateSkill(ctx, laiclient.Skill{
-		Name:        cr.Spec.ForProvider.Name,
-		Description: cr.Spec.ForProvider.Description,
-		Content:     cr.Spec.ForProvider.Content,
-	})
-	if err != nil {
+	p := cr.Spec.ForProvider
+	if _, err := e.client.CreateSkill(ctx, laiclient.SkillWrite{
+		Layer:       p.Layer,
+		Name:        p.Name,
+		Description: p.Description,
+		Body:        p.Content,
+	}); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateSkill)
 	}
-	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
 	return managed.ExternalCreation{}, nil
 }
 
+// Update replaces the skill's description and body.
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*skillv1beta1.Skill)
-	_, err := e.client.UpdateSkill(ctx, cr.Spec.ForProvider.Name, laiclient.Skill{
-		Name:        cr.Spec.ForProvider.Name,
-		Description: cr.Spec.ForProvider.Description,
-		Content:     cr.Spec.ForProvider.Content,
-	})
-	if err != nil {
+	p := cr.Spec.ForProvider
+	if _, err := e.client.UpdateSkill(ctx, p.Layer, p.Name, laiclient.SkillUpdate{
+		Description: p.Description,
+		Body:        p.Content,
+	}); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateSkill)
 	}
 	return managed.ExternalUpdate{}, nil
 }
 
+// Delete removes the skill. A skill that is already gone is not an error.
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr := mg.(*skillv1beta1.Skill)
-	if !clients.DeletesExternal(cr.Status.AtProvider.Ownership) {
-		// The skill was already in LocalAI and is not ours to remove.
-		return managed.ExternalDelete{}, nil
-	}
-	if err := e.client.DeleteSkill(ctx, cr.Spec.ForProvider.Name); err != nil {
+	p := cr.Spec.ForProvider
+	if err := e.client.DeleteSkill(ctx, p.Layer, p.Name); err != nil && !laiclient.IsNotFound(err) {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteSkill)
 	}
 	return managed.ExternalDelete{}, nil
