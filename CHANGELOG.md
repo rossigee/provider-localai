@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Settings resources apply LocalAI runtime settings through
+  `POST /api/settings`. `spec.forProvider.settings` is a JSON object, and only
+  allow-listed keys are accepted. The provider records a hash of the applied
+  settings and posts them again when they change. Settings changed directly in
+  LocalAI are not detected. Deleting the resource leaves LocalAI's settings
+  unchanged.
+
+### Removed
+
+- `spec.forProvider.baseURL` on Settings. It was never used. Set the endpoint on
+  the ProviderConfig.
+
 ### Breaking (Model URLs)
 
 - A Model whose configuration contains an `http` or `https` URL is rejected

@@ -1,0 +1,13 @@
+apiVersion: settings.localai.m.crossplane.io/v1beta1
+kind: Settings
+metadata:
+  name: localai-runtime
+  namespace: crossplane-system
+spec:
+  forProvider:
+    # Posted to LocalAI's POST /api/settings. LocalAI merges these keys into its
+    # saved settings. Keys not listed here are left unchanged.
+    settings: |
+      {"watchdog_idle_timeout": "15m", "threads": 8}
+  providerConfigRef:
+    name: localai
