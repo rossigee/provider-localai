@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-14
+
 ### Breaking
 
 - Agents and skills use the chats API (`/api/chats/agents`, `/api/chats/skills`).
