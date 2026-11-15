@@ -25,10 +25,21 @@ func settingsCR(raw string) *settingsv1beta1.Settings {
 // fakeLocalAI returns an external whose requests are recorded by the handler.
 func fakeLocalAI(t *testing.T, status int, record func(r *http.Request, body []byte)) *external {
 	t.Helper()
+	var stored string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if stored == "" {
+				stored = "{}"
+			}
+			_, _ = io.WriteString(w, stored)
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		if record != nil {
 			record(r, body)
+		}
+		if status >= 200 && status < 300 {
+			stored = string(body)
 		}
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, `{"success":true}`)
@@ -150,4 +161,78 @@ func TestDeleteLeavesLocalAIAlone(t *testing.T) {
 	if requests != 0 {
 		t.Errorf("Delete sent %d request(s), want 0", requests)
 	}
+}
+
+func TestObserveDetectsSettingChangedInLocalAI(t *testing.T) {
+	var stored = `{"threads":8}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = io.WriteString(w, stored)
+			return
+		}
+		_, _ = io.WriteString(w, `{"success":true}`)
+	}))
+	t.Cleanup(srv.Close)
+	e := &external{cfg: laiclient.Config{BaseURL: srv.URL, APIKey: "k"}, httpClient: srv.Client()}
+	cr := settingsCR(`{"threads":8}`)
+	cr.Status.AtProvider.AppliedHash = settingsHashFor(t, `{"threads":8}`)
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceUpToDate {
+		t.Fatalf("observe = %+v, want up to date while LocalAI matches", obs)
+	}
+	stored = `{"threads":4}`
+	obs, err = e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if obs.ResourceUpToDate {
+		t.Error("a setting changed in LocalAI did not mark the resource out of date")
+	}
+}
+
+func TestObserveReportsMissingSettingAsDrift(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	t.Cleanup(srv.Close)
+	e := &external{cfg: laiclient.Config{BaseURL: srv.URL, APIKey: "k"}, httpClient: srv.Client()}
+	cr := settingsCR(`{"threads":8}`)
+	cr.Status.AtProvider.AppliedHash = settingsHashFor(t, `{"threads":8}`)
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if obs.ResourceUpToDate {
+		t.Error("a managed key LocalAI does not report was treated as up to date")
+	}
+}
+
+func TestObserveSurfacesUnreadableSettings(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	e := &external{cfg: laiclient.Config{BaseURL: srv.URL, APIKey: "k"}, httpClient: srv.Client()}
+	cr := settingsCR(`{"threads":8}`)
+	cr.Status.AtProvider.AppliedHash = settingsHashFor(t, `{"threads":8}`)
+	if _, err := e.Observe(context.Background(), cr); err == nil {
+		t.Fatal("Observe hid an unreadable settings response")
+	}
+}
+
+// settingsHashFor is the hash Create records for the given settings.
+func settingsHashFor(t *testing.T, raw string) string {
+	t.Helper()
+	desired, err := parseSettings(raw)
+	if err != nil {
+		t.Fatalf("parseSettings: %v", err)
+	}
+	h, err := settingsHash(desired)
+	if err != nil {
+		t.Fatalf("settingsHash: %v", err)
+	}
+	return h
 }
