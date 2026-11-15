@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `spec.forProvider.enabled` and `spec.forProvider.pinned` on Model. When set,
+  the provider keeps the model enabled or disabled, and pinned or unpinned, in
+  LocalAI. Unset flags are not managed.
+
 ## [0.6.0] - 2026-11-15
 
 ### Added

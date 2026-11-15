@@ -54,8 +54,18 @@ spec:
                       carries its own name it must match Name; name and backend in the CR
                       are authoritative.
                     type: string
+                  enabled:
+                    description: |-
+                      Enabled, when set, keeps the model enabled (true) or disabled (false) in
+                      LocalAI. When unset the provider does not manage the flag.
+                    type: boolean
                   name:
                     type: string
+                  pinned:
+                    description: |-
+                      Pinned, when set, keeps the model pinned (true) or unpinned (false) in
+                      LocalAI. When unset the provider does not manage the flag.
+                    type: boolean
                 required:
                 - name
                 type: object

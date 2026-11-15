@@ -71,5 +71,15 @@ func (in *ModelList) DeepCopyObject() runtime.Object {
 	return nil
 }
 
-func (in *ModelSpec) DeepCopyInto(out *ModelSpec)     { *out = *in }
+func (in *ModelSpec) DeepCopyInto(out *ModelSpec) {
+	*out = *in
+	if in.ForProvider.Enabled != nil {
+		v := *in.ForProvider.Enabled
+		out.ForProvider.Enabled = &v
+	}
+	if in.ForProvider.Pinned != nil {
+		v := *in.ForProvider.Pinned
+		out.ForProvider.Pinned = &v
+	}
+}
 func (in *ModelStatus) DeepCopyInto(out *ModelStatus) { *out = *in }

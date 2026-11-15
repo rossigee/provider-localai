@@ -172,13 +172,18 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			if observed == "" {
 				// Adopt the existing external model as the baseline for
 				// drift detection without overwriting its stored
-				// configuration on first contact. LocalAI has no endpoint
-				// that returns a model's config, so the status hash is the
-				// only way to know when the spec has moved.
+				// configuration on first contact.
 				cr.Status.AtProvider.ConfigHash = hash
-				return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+				observed = hash
 			}
-			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: observed == hash}, nil
+			current := observed == hash
+			if current {
+				current, err = e.stateCurrent(ctx, cr)
+				if err != nil {
+					return managed.ExternalObservation{}, errors.Wrap(err, errGetModel)
+				}
+			}
+			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: current}, nil
 		}
 	}
 	// The model is not listed. If an import job is still inside its timeout,
@@ -190,6 +195,67 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.AtProvider.PendingImportUUID = ""
 	cr.Status.AtProvider.PendingImportSince = ""
 	return managed.ExternalObservation{ResourceExists: false}, nil
+}
+
+// stateCurrent reports whether the enabled and pinned flags LocalAI reports
+// match the spec. A flag the spec does not set is not compared. A model
+// LocalAI does not list yet is not current, so the next reconcile applies
+// the flags once it appears.
+func (e *external) stateCurrent(ctx context.Context, cr *modelv1beta1.Model) (bool, error) {
+	p := cr.Spec.ForProvider
+	if p.Enabled == nil && p.Pinned == nil {
+		return true, nil
+	}
+	caps, err := e.client.ListModelCapabilities(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, c := range caps {
+		if c.ID != p.Name {
+			continue
+		}
+		// enabled is !disabled, so the flags disagree when the spec's
+		// enabled value equals the reported disabled value.
+		if p.Enabled != nil && *p.Enabled == c.Disabled {
+			return false, nil
+		}
+		if p.Pinned != nil && *p.Pinned != c.Pinned {
+			return false, nil
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// syncState applies the managed flags that differ from LocalAI. It runs after
+// the config import, because an import rewrites the model's file. A model
+// LocalAI does not list yet is left for the next reconcile.
+func (e *external) syncState(ctx context.Context, cr *modelv1beta1.Model) error {
+	p := cr.Spec.ForProvider
+	if p.Enabled == nil && p.Pinned == nil {
+		return nil
+	}
+	caps, err := e.client.ListModelCapabilities(ctx)
+	if err != nil {
+		return err
+	}
+	for _, c := range caps {
+		if c.ID != p.Name {
+			continue
+		}
+		if p.Enabled != nil && *p.Enabled == c.Disabled {
+			if err := e.client.SetModelEnabled(ctx, p.Name, *p.Enabled); err != nil {
+				return err
+			}
+		}
+		if p.Pinned != nil && *p.Pinned != c.Pinned {
+			if err := e.client.SetModelPinned(ctx, p.Name, *p.Pinned); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return nil
 }
 
 // pendingImportExpired reports whether a pending import submitted at since is
@@ -287,6 +353,9 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := e.importModel(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateModel)
 	}
+	if err := e.syncState(ctx, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateModel)
+	}
 	cr.Status.AtProvider.Name = cr.Spec.ForProvider.Name
 	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
 	return managed.ExternalCreation{}, nil
@@ -295,6 +364,9 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*modelv1beta1.Model)
 	if err := e.importModel(ctx, cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateModel)
+	}
+	if err := e.syncState(ctx, cr); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateModel)
 	}
 	cr.Status.AtProvider.Name = cr.Spec.ForProvider.Name

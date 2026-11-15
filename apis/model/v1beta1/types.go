@@ -19,6 +19,14 @@ type ModelParameters struct {
 	// are authoritative.
 	// +optional
 	Config string `json:"config,omitempty"`
+	// Enabled, when set, keeps the model enabled (true) or disabled (false) in
+	// LocalAI. When unset the provider does not manage the flag.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// Pinned, when set, keeps the model pinned (true) or unpinned (false) in
+	// LocalAI. When unset the provider does not manage the flag.
+	// +optional
+	Pinned *bool `json:"pinned,omitempty"`
 }
 
 type ModelObservation struct {
