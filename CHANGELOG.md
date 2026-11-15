@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spec.forProvider.enabled` and `spec.forProvider.pinned` on Model. When set,
   the provider keeps the model enabled or disabled, and pinned or unpinned, in
   LocalAI. Unset flags are not managed.
+- A Settings resource now reads its managed keys back from LocalAI on each
+  observe. A value changed in LocalAI, or a managed key LocalAI no longer
+  reports, marks the resource out of date and it is applied again.
 
 ## [0.6.0] - 2026-11-15
 

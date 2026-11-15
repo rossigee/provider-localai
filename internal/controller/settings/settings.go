@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -31,6 +32,7 @@ const (
 	errNotSettings      = "managed resource is not a Settings"
 	errProviderNotReady = "provider is not ready"
 	errPostSettings     = "cannot apply LocalAI settings"
+	errGetSettings      = "cannot read LocalAI settings"
 
 	controllerName = "settings.settings.localai.m.crossplane.io"
 
@@ -146,9 +148,12 @@ type external struct {
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
 // Observe reports the resource as existing once settings have been applied.
-// Until then it reports it missing, so Create posts the settings. After that,
-// a change to spec.forProvider.settings makes it out of date.
-func (e *external) Observe(_ context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
+// Until then it reports it missing, so Create posts the settings. After that it
+// reads the managed keys back from LocalAI: a change to spec.forProvider.settings,
+// or a change made in LocalAI itself, makes the resource out of date. Keys the
+// spec does not set are not read back in a way that matters, so they are not
+// compared.
+func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr := mg.(*settingsv1beta1.Settings)
 	desired, err := parseSettings(cr.Spec.ForProvider.Settings)
 	if err != nil {
@@ -162,10 +167,79 @@ func (e *external) Observe(_ context.Context, mg resource.Managed) (managed.Exte
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 	cr.Status.SetConditions(xpv1.Available())
-	return managed.ExternalObservation{
-		ResourceExists:   true,
-		ResourceUpToDate: cr.Status.AtProvider.AppliedHash == hash,
-	}, nil
+	upToDate := cr.Status.AtProvider.AppliedHash == hash
+	if upToDate {
+		current, err := e.current(ctx)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errGetSettings)
+		}
+		upToDate = settingsMatch(desired, current)
+	}
+	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: upToDate}, nil
+}
+
+// current reads LocalAI's runtime settings. The response carries credentials
+// for an authorized administrator; only the keys the spec sets are kept.
+func (e *external) current(ctx context.Context) (map[string]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(e.cfg.BaseURL, "/")+settingsPath, nil)
+	if err != nil {
+		return nil, err
+	}
+	if e.cfg.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+e.cfg.APIKey)
+	}
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	raw, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	closeErr := resp.Body.Close()
+	if readErr != nil {
+		return nil, errors.Wrap(readErr, "cannot read LocalAI response")
+	}
+	if closeErr != nil {
+		return nil, errors.Wrap(closeErr, "cannot close LocalAI response")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, errors.Errorf("LocalAI returned %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, errors.Wrap(err, "cannot decode LocalAI settings")
+	}
+	return out, nil
+}
+
+// settingsMatch reports whether every key the spec sets has the same value in
+// LocalAI. Values are compared after a JSON round trip, so numbers match however
+// they were decoded.
+func settingsMatch(desired, current map[string]any) bool {
+	for k, want := range desired {
+		got, ok := current[k]
+		if !ok {
+			return false
+		}
+		if !jsonEqual(want, got) {
+			return false
+		}
+	}
+	return true
+}
+
+func jsonEqual(a, b any) bool {
+	ab, err := json.Marshal(a)
+	if err != nil {
+		return false
+	}
+	bb, err := json.Marshal(b)
+	if err != nil {
+		return false
+	}
+	var av, bv any
+	if json.Unmarshal(ab, &av) != nil || json.Unmarshal(bb, &bv) != nil {
+		return false
+	}
+	return reflect.DeepEqual(av, bv)
 }
 
 // post sends the settings to LocalAI. LocalAI merges them into its saved

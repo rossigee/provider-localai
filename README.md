@@ -141,6 +141,11 @@ Keys that control authentication or cross-origin access (`api_keys`, `csrf`,
 `autoload_*`), open a network (`p2p_*`, `federated`), or enable tools (`chats_*`)
 are rejected.
 
+On each observe the provider reads the managed keys back from `GET /api/settings`
+and compares them with the spec. A value changed in LocalAI, or a managed key
+LocalAI does not report, marks the resource out of date and the settings are
+applied again. Keys the spec does not set are not compared.
+
 The provider records a hash of the settings it last applied in
 `status.atProvider.appliedHash`. A change to `spec.forProvider.settings` posts
 the settings again. Settings changed directly in LocalAI are not detected,
