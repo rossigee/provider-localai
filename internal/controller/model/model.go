@@ -31,6 +31,9 @@ import (
 )
 
 const (
+	errGalleryAndConfig = "spec.forProvider.gallery and spec.forProvider.config are mutually exclusive"
+	errGalleryJob       = "LocalAI gallery install failed: %s"
+
 	errNotModel         = "managed resource is not a Model"
 	errGetModel         = "cannot list LocalAI models"
 	errParseConfig      = "cannot parse model config"
@@ -168,6 +171,13 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			clients.RecordFirstObservation(&cr.Status.AtProvider.Ownership, cr.Status.AtProvider.Name)
 			cr.Status.AtProvider.Name = m.Name
 			cr.Status.SetConditions(xpv1.Available())
+			if cr.Spec.ForProvider.Gallery != nil {
+				current, err := e.stateCurrent(ctx, cr)
+				if err != nil {
+					return managed.ExternalObservation{}, errors.Wrap(err, errGetModel)
+				}
+				return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: current}, nil
+			}
 			observed := cr.Status.AtProvider.ConfigHash
 			if observed == "" {
 				// Adopt the existing external model as the baseline for
@@ -186,6 +196,19 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: current}, nil
 		}
 	}
+	// The model is not listed. For a gallery install, a failed job is
+	// reported and cleared so the next reconcile installs it again.
+	if cr.Spec.ForProvider.Gallery != nil && cr.Status.AtProvider.PendingImportUUID != "" {
+		job, err := e.client.GetModelJob(ctx, cr.Status.AtProvider.PendingImportUUID)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errGetModel)
+		}
+		if job.Error != "" {
+			cr.Status.AtProvider.PendingImportUUID = ""
+			cr.Status.AtProvider.PendingImportSince = ""
+			return managed.ExternalObservation{}, errors.Errorf(errGalleryJob, job.Error)
+		}
+	}
 	// The model is not listed. If an import job is still inside its timeout,
 	// report it as existing and current so the reconciler does not post the
 	// import again. Once the model appears, the branch above records it.
@@ -195,6 +218,28 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.AtProvider.PendingImportUUID = ""
 	cr.Status.AtProvider.PendingImportSince = ""
 	return managed.ExternalObservation{ResourceExists: false}, nil
+}
+
+// installFromGallery starts a gallery install under the Model's name and
+// records its job for Observe to follow.
+func (e *external) installFromGallery(ctx context.Context, cr *modelv1beta1.Model) (managed.ExternalCreation, error) {
+	if cr.Spec.ForProvider.Config != "" {
+		return managed.ExternalCreation{}, errors.New(errGalleryAndConfig)
+	}
+	g := cr.Spec.ForProvider.Gallery
+	resp, err := e.client.ApplyModelFromGallery(ctx, laiclient.GalleryApplyRequest{
+		ID:      g.ID,
+		Variant: g.Variant,
+		Name:    cr.Spec.ForProvider.Name,
+	})
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateModel)
+	}
+	cr.Status.AtProvider.PendingImportUUID = resp.ID
+	cr.Status.AtProvider.PendingImportSince = time.Now().UTC().Format(time.RFC3339)
+	cr.Status.AtProvider.Name = cr.Spec.ForProvider.Name
+	cr.Status.AtProvider.Ownership = clients.OwnershipCreated
+	return managed.ExternalCreation{}, nil
 }
 
 // stateCurrent reports whether the enabled and pinned flags LocalAI reports
@@ -350,6 +395,9 @@ func (e *external) do(ctx context.Context, method, path string, body, out any) e
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*modelv1beta1.Model)
+	if cr.Spec.ForProvider.Gallery != nil {
+		return e.installFromGallery(ctx, cr)
+	}
 	if err := e.importModel(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateModel)
 	}
@@ -363,6 +411,15 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*modelv1beta1.Model)
+	if cr.Spec.ForProvider.Gallery != nil {
+		if cr.Spec.ForProvider.Config != "" {
+			return managed.ExternalUpdate{}, errors.New(errGalleryAndConfig)
+		}
+		if err := e.syncState(ctx, cr); err != nil {
+			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateModel)
+		}
+		return managed.ExternalUpdate{}, nil
+	}
 	if err := e.importModel(ctx, cr); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateModel)
 	}
