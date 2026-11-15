@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Collection` resource for LocalAI knowledge-base collections. It keeps the
+  URLs listed in `spec.forProvider.sources` followed. Deleting it stops those
+  URLs; LocalAI has no endpoint that deletes a collection.
+
 ## [0.5.0] - 2026-11-14
 
 ### Breaking
