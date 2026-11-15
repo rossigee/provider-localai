@@ -201,6 +201,11 @@ body, so an edit is pushed on the next reconcile.
 
 ### Model
 
+`spec.forProvider.enabled` and `spec.forProvider.pinned` keep a model enabled
+or disabled, and pinned or unpinned, in LocalAI. A flag the spec leaves unset is
+not managed. The flags are read from `/api/models/capabilities` and applied after
+the config import.
+
 - `Create`/`Update` POST the configuration to `/models/import`, which writes
   `/models/<name>.yaml`. Re-importing overwrites, so both operations are the
   same call; both are synchronous unless the config references downloads
