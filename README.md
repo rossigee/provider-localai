@@ -102,6 +102,17 @@ uses that ID for every later call. A Skill is identified by its `layer` and
 `name`. Deleting the resource deletes the LocalAI object; an object that is
 already gone is not an error.
 
+### Collections
+
+A Collection is a LocalAI knowledge-base collection. `spec.forProvider.sources`
+lists the URLs it follows. The provider keeps exactly those URLs: a URL it
+does not list is stopped on the next reconcile. `updateIntervalMinutes` is
+compared only when it is set.
+
+LocalAI has no endpoint that deletes a collection. Deleting the resource stops
+the URLs listed in its spec, and the collection and its entries stay in LocalAI.
+Files uploaded to a collection are not managed by this resource.
+
 ### Model upstreams
 
 A Model configuration can make LocalAI fetch URLs (`download_files`, URI-valued
@@ -221,6 +232,7 @@ body, so an edit is pushed on the next reconcile.
 |----------|-----------|-------------|
 | Agent | `agent.localai.m.crossplane.io/v1beta1` | LocalAI agents, with model, instructions, skills, collections and MCP servers |
 | Skill | `skill.localai.m.crossplane.io/v1beta1` | Skills available to agents |
+| Collection | `collection.localai.m.crossplane.io/v1beta1` | Knowledge-base collections that follow URLs |
 | Model | `model.localai.m.crossplane.io/v1beta1` | Models available to the LocalAI deployment |
 | Settings | `settings.localai.m.crossplane.io/v1beta1` | LocalAI instance settings |
 | ProviderConfig | `localai.m.crossplane.io/v1beta1` | LocalAI endpoint, API key and private CA |

@@ -5,6 +5,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/rossigee/provider-localai/internal/controller/agent"
+	"github.com/rossigee/provider-localai/internal/controller/collection"
 	"github.com/rossigee/provider-localai/internal/controller/model"
 	"github.com/rossigee/provider-localai/internal/controller/providerconfig"
 	"github.com/rossigee/provider-localai/internal/controller/settings"
@@ -21,6 +22,9 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		return err
 	}
 	if err := skill.Setup(mgr, o); err != nil {
+		return err
+	}
+	if err := collection.Setup(mgr, o); err != nil {
 		return err
 	}
 	if err := model.Setup(mgr, o); err != nil {

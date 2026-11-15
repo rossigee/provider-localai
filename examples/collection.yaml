@@ -1,0 +1,13 @@
+apiVersion: collection.localai.m.crossplane.io/v1beta1
+kind: Collection
+metadata:
+  name: docs
+  namespace: crossplane-system
+spec:
+  forProvider:
+    name: docs
+    sources:
+      - url: https://docs.example.com/handbook.md
+        updateIntervalMinutes: 60
+  providerConfigRef:
+    name: localai
