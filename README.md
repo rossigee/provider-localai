@@ -102,6 +102,17 @@ uses that ID for every later call. A Skill is identified by its `layer` and
 `name`. Deleting the resource deletes the LocalAI object; an object that is
 already gone is not an error.
 
+### Agent tasks
+
+An AgentTask is a saved LocalAI agent task. Its name, description, model, agent
+ID, prompt and enabled flag are managed; the provider reads them back and applies
+changes. The task's LocalAI ID is its external name. Deleting the resource deletes
+the task; its past jobs stay until LocalAI's retention passes.
+
+Cron schedules, multimedia sources and webhooks are not managed. LocalAI rejects
+cron on a task (schedule a saved agent with a trigger instead), and webhook
+headers come back hidden, so their values cannot be compared.
+
 ### Collections
 
 A Collection is a LocalAI knowledge-base collection. `spec.forProvider.sources`
@@ -249,6 +260,7 @@ the config import.
 | Agent | `agent.localai.m.crossplane.io/v1beta1` | LocalAI agents, with model, instructions, skills, collections and MCP servers |
 | Skill | `skill.localai.m.crossplane.io/v1beta1` | Skills available to agents |
 | Collection | `collection.localai.m.crossplane.io/v1beta1` | Knowledge-base collections that follow URLs |
+| AgentTask | `agenttask.localai.m.crossplane.io/v1beta1` | Saved agent tasks: prompt, model, agent and enabled flag |
 | Model | `model.localai.m.crossplane.io/v1beta1` | Models available to the LocalAI deployment |
 | Settings | `settings.localai.m.crossplane.io/v1beta1` | LocalAI instance settings |
 | ProviderConfig | `localai.m.crossplane.io/v1beta1` | LocalAI endpoint, API key and private CA |
