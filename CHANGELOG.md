@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Settings resource now reads its managed keys back from LocalAI on each
   observe. A value changed in LocalAI, or a managed key LocalAI no longer
   reports, marks the resource out of date and it is applied again.
+- `AgentTask` resource for saved LocalAI agent tasks: the name, description,
+  model, agent ID, prompt and enabled flag. Cron, multimedia sources and
+  webhooks are not managed. LocalAI rejects cron on a task, and webhook headers
+  are hidden on read.
 
 ## [0.6.0] - 2026-11-15
 
