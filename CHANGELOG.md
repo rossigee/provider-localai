@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `spec.forProvider.gallery` on Model installs the model from a LocalAI gallery
+  entry (`id`, optional `variant`) instead of importing `config`. The install is
+  named after the Model. A failed install is reported and retried on the next
+  reconcile. `gallery` and `config` are mutually exclusive.
 - `spec.forProvider.enabled` and `spec.forProvider.pinned` on Model. When set,
   the provider keeps the model enabled or disabled, and pinned or unpinned, in
   LocalAI. Unset flags are not managed.

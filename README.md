@@ -217,6 +217,12 @@ body, so an edit is pushed on the next reconcile.
 
 ### Model
 
+`spec.forProvider.gallery` installs the model from a LocalAI gallery entry, by
+`id` and an optional `variant`, under the Model's name. The provider polls the
+install job, and a failed install is reported and retried on the next reconcile.
+`gallery` and `config` cannot both be set. Gallery models are not re-installed
+on update; only `enabled` and `pinned` are applied.
+
 `spec.forProvider.enabled` and `spec.forProvider.pinned` keep a model enabled
 or disabled, and pinned or unpinned, in LocalAI. A flag the spec leaves unset is
 not managed. The flags are read from `/api/models/capabilities` and applied after
