@@ -34,9 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The provider no longer panics at startup. Collection and AgentTask were not
-  registered with the scheme, which crash-looped v0.6.0. A regression test now
-  covers both groups.
+- Register the `Collection` and `AgentTask` API groups in the provider's scheme.
+  v0.6.0 added the `Collection` controller and CRD but never called
+  `collectionv1beta1.AddToScheme`, so the provider panicked at startup with
+  `no kind "Collection" is registered for version
+  collection.localai.m.crossplane.io/v1beta1 in scheme` and crash-looped.
+  A regression test now asserts that every API type is registered.
 
 ## [0.6.0] - 2026-11-15
 
