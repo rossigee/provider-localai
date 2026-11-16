@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-17
+
 ### Added
 
 - `spec.forProvider.gallery` on Model installs the model from a LocalAI gallery
@@ -23,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   model, agent ID, prompt and enabled flag. Cron, multimedia sources and
   webhooks are not managed. LocalAI rejects cron on a task, and webhook headers
   are hidden on read.
+
+### Fixed
+
+- The provider no longer panics at startup. Collection and AgentTask were not
+  registered with the scheme, which crash-looped v0.6.0. A regression test now
+  covers both groups.
 
 ## [0.6.0] - 2026-11-15
 
