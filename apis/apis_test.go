@@ -11,6 +11,7 @@ import (
 	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
 	settingsv1beta1 "github.com/rossigee/provider-localai/apis/settings/v1beta1"
 	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
+	triggerv1beta1 "github.com/rossigee/provider-localai/apis/trigger/v1beta1"
 	v1beta1 "github.com/rossigee/provider-localai/apis/v1beta1"
 )
 
@@ -38,6 +39,8 @@ func TestAddToSchemeRegistersEveryAPIType(t *testing.T) {
 		&collectionv1beta1.CollectionList{},
 		&agenttaskv1beta1.AgentTask{},
 		&agenttaskv1beta1.AgentTaskList{},
+		&triggerv1beta1.Trigger{},
+		&triggerv1beta1.TriggerList{},
 	}
 	for _, obj := range objects {
 		gvks, _, err := s.ObjectKinds(obj)

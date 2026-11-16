@@ -11,6 +11,7 @@ import (
 	"github.com/rossigee/provider-localai/internal/controller/providerconfig"
 	"github.com/rossigee/provider-localai/internal/controller/settings"
 	"github.com/rossigee/provider-localai/internal/controller/skill"
+	"github.com/rossigee/provider-localai/internal/controller/trigger"
 )
 
 // Setup sets up LocalAI provider controllers.
@@ -29,6 +30,9 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		return err
 	}
 	if err := agenttask.Setup(mgr, o); err != nil {
+		return err
+	}
+	if err := trigger.Setup(mgr, o); err != nil {
 		return err
 	}
 	if err := model.Setup(mgr, o); err != nil {

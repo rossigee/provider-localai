@@ -1,0 +1,24 @@
+package v1beta1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
+const (
+	Group   = "trigger.localai.m.crossplane.io"
+	Version = "v1beta1"
+)
+
+var (
+	SchemeGroupVersion = schema.GroupVersion{Group: Group, Version: Version}
+	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme        = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(s *runtime.Scheme) error {
+	s.AddKnownTypes(SchemeGroupVersion, &Trigger{}, &TriggerList{})
+	metav1.AddToGroupVersion(s, SchemeGroupVersion)
+	return nil
+}

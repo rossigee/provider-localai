@@ -102,6 +102,14 @@ uses that ID for every later call. A Skill is identified by its `layer` and
 `name`. Deleting the resource deletes the LocalAI object; an object that is
 already gone is not an error.
 
+### Triggers
+
+A Trigger is a LocalAI chat trigger: a prompt that runs on a schedule, through a
+saved agent or a model. The name, prompt, schedule kind and time, daily cap,
+agent, model and enabled flag are managed. The trigger's LocalAI ID is its
+external name. Only the `schedule` kind is managed. Deleting the resource deletes
+the trigger.
+
 ### Agent tasks
 
 An AgentTask is a saved LocalAI agent task. Its name, description, model, agent
@@ -261,6 +269,7 @@ the config import.
 | Skill | `skill.localai.m.crossplane.io/v1beta1` | Skills available to agents |
 | Collection | `collection.localai.m.crossplane.io/v1beta1` | Knowledge-base collections that follow URLs |
 | AgentTask | `agenttask.localai.m.crossplane.io/v1beta1` | Saved agent tasks: prompt, model, agent and enabled flag |
+| Trigger | `trigger.localai.m.crossplane.io/v1beta1` | Chat triggers that run a prompt on a schedule |
 | Model | `model.localai.m.crossplane.io/v1beta1` | Models available to the LocalAI deployment |
 | Settings | `settings.localai.m.crossplane.io/v1beta1` | LocalAI instance settings |
 | ProviderConfig | `localai.m.crossplane.io/v1beta1` | LocalAI endpoint, API key and private CA |
