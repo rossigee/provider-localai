@@ -81,5 +81,9 @@ func (in *ModelSpec) DeepCopyInto(out *ModelSpec) {
 		v := *in.ForProvider.Pinned
 		out.ForProvider.Pinned = &v
 	}
+	if in.ForProvider.Gallery != nil {
+		g := *in.ForProvider.Gallery
+		out.ForProvider.Gallery = &g
+	}
 }
 func (in *ModelStatus) DeepCopyInto(out *ModelStatus) { *out = *in }

@@ -6,6 +6,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// GalleryInstall names a model in a LocalAI gallery to install.
+type GalleryInstall struct {
+	// ID is the gallery entry's name.
+	ID string `json:"id"`
+	// Variant names one build of an entry that declares variants. Empty lets
+	// LocalAI pick one.
+	// +optional
+	Variant string `json:"variant,omitempty"`
+}
+
 type ModelParameters struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -27,6 +37,10 @@ type ModelParameters struct {
 	// LocalAI. When unset the provider does not manage the flag.
 	// +optional
 	Pinned *bool `json:"pinned,omitempty"`
+	// Gallery, when set, installs the model from a LocalAI gallery entry
+	// instead of importing Config. It is mutually exclusive with Config.
+	// +optional
+	Gallery *GalleryInstall `json:"gallery,omitempty"`
 }
 
 type ModelObservation struct {
