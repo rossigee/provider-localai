@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Trigger` resource for LocalAI chat triggers. It manages the name, prompt,
+  schedule kind and time, daily cap, agent, model and enabled flag. Only the
+  `schedule` kind is managed. Plans, costs and proposals are not managed.
+
 ## [0.7.0] - 2026-11-17
 
 ### Added
