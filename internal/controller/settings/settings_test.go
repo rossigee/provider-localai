@@ -78,6 +78,46 @@ func TestParseSettingsRequiresObject(t *testing.T) {
 	}
 }
 
+func TestParseSettingsAcceptsToolSearchModes(t *testing.T) {
+	for _, mode := range []string{"auto", "on", "off"} {
+		raw, _ := json.Marshal(map[string]any{"chats_tool_search": mode})
+		if _, err := parseSettings(string(raw)); err != nil {
+			t.Errorf("chats_tool_search %q: %v, want accepted", mode, err)
+		}
+	}
+}
+
+func TestParseSettingsRejectsOtherToolSearchValues(t *testing.T) {
+	for _, mode := range []any{"ON", "maybe", "", true, 1} {
+		raw, _ := json.Marshal(map[string]any{"chats_tool_search": mode})
+		if _, err := parseSettings(string(raw)); err == nil {
+			t.Errorf("chats_tool_search %v: accepted, want rejection", mode)
+		}
+	}
+}
+
+func TestParseSettingsAllowsLocalAIAdminOnlyOff(t *testing.T) {
+	if _, err := parseSettings(`{"chats_localai_admin":false}`); err != nil {
+		t.Errorf("chats_localai_admin false: %v, want accepted", err)
+	}
+	if _, err := parseSettings(`{"chats_localai_admin":true}`); err == nil {
+		t.Error("chats_localai_admin true: accepted, want rejection: the resource must never open admin tools")
+	}
+}
+
+func TestParseSettingsKeepsOtherChatsKeysRejected(t *testing.T) {
+	for _, raw := range []string{
+		`{"chats_localai_client":true}`,
+		`{"chats_saved_agents":true}`,
+		`{"chats_host_exec":"bash"}`,
+		`{"client_jobs_allow_all_tools":true}`,
+	} {
+		if _, err := parseSettings(raw); err == nil {
+			t.Errorf("parseSettings(%s) accepted, want rejection", raw)
+		}
+	}
+}
+
 func TestObserveMissingUntilApplied(t *testing.T) {
 	e := fakeLocalAI(t, http.StatusOK, nil)
 	cr := settingsCR(`{"threads":8}`)

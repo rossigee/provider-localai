@@ -168,6 +168,13 @@ Keys that control authentication or cross-origin access (`api_keys`, `csrf`,
 `autoload_*`), open a network (`p2p_*`, `federated`), or enable tools (`chats_*`)
 are rejected.
 
+Two `chats_*` keys are the exception, with fixed values:
+
+- `chats_tool_search` accepts `auto`, `on` or `off`. It only defers the large tool
+  groups behind search tools.
+- `chats_localai_admin` accepts `false` only. The resource can close the LocalAI
+  admin tools for every chat but cannot open them.
+
 On each observe the provider reads the managed keys back from `GET /api/settings`
 and compares them with the spec. A value changed in LocalAI, or a managed key
 LocalAI does not report, marks the resource out of date and the settings are
