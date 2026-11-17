@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	stderrors "errors"
+	"net/http"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -174,15 +176,53 @@ func agentWrite(cr *agentv1beta1.Agent) laiclient.AgentWrite {
 }
 
 // Create saves the agent and records its LocalAI ID as the external name.
+// Create saves the agent and records its LocalAI ID as the external name.
+//
+// An agent that already exists under this name (for example one created before
+// the external name became the LocalAI ID) is adopted rather than failed: its ID
+// is recorded, and the next reconcile updates it to the spec.
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*agentv1beta1.Agent)
 	a, err := e.client.CreateAgent(ctx, agentWrite(cr))
 	if err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
+		if !isNameConflict(err) {
+			return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
+		}
+		existing, lerr := e.findAgentByName(ctx, cr.Spec.ForProvider.Name)
+		if lerr != nil {
+			return managed.ExternalCreation{}, errors.Wrap(lerr, errCreateAgent)
+		}
+		if existing == nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
+		}
+		meta.SetExternalName(cr, existing.ID)
+		cr.Status.AtProvider.ID = existing.ID
+		return managed.ExternalCreation{}, nil
 	}
 	meta.SetExternalName(cr, a.ID)
 	cr.Status.AtProvider.ID = a.ID
 	return managed.ExternalCreation{}, nil
+}
+
+// isNameConflict reports whether LocalAI refused the create because an agent
+// with the same name already exists.
+func isNameConflict(err error) bool {
+	var apiErr *laiclient.APIError
+	return stderrors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict
+}
+
+// findAgentByName returns the saved agent with the given name, or nil.
+func (e *external) findAgentByName(ctx context.Context, name string) (*laiclient.Agent, error) {
+	agents, err := e.client.ListAgents(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range agents {
+		if agents[i].Name == name {
+			return &agents[i], nil
+		}
+	}
+	return nil, nil
 }
 
 // Update replaces the saved agent. LocalAI's update replaces the whole agent,

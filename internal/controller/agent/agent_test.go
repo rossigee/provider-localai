@@ -160,3 +160,40 @@ func TestDeleteWithoutExternalNameSendsNothing(t *testing.T) {
 		t.Errorf("Delete sent %d request(s) without an external name, want 0", requests)
 	}
 }
+
+func TestCreateAdoptsExistingAgentOnNameConflict(t *testing.T) {
+	e, _ := agentExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/chats/agents":
+			w.WriteHeader(http.StatusConflict)
+			_, _ = io.WriteString(w, `{"error":{"code":409,"message":"you already have an agent with this name","type":"conflict"}}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/api/chats/agents":
+			_, _ = io.WriteString(w, `{"agents":[{"id":"legacy1","name":"reviewer","mcp_servers":[],"addons":[],"collections":[],"skills":[],"network":"off"}]}`)
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+	cr := agentCR("reviewer")
+	meta.SetExternalName(cr, "reviewer")
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatalf("Create adopting an existing agent returned %v, want nil", err)
+	}
+	if got := meta.GetExternalName(cr); got != "legacy1" {
+		t.Errorf("external name = %q, want the adopted ID legacy1", got)
+	}
+}
+
+func TestCreateConflictWithoutMatchingAgentFails(t *testing.T) {
+	e, _ := agentExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			w.WriteHeader(http.StatusConflict)
+			_, _ = io.WriteString(w, `{"error":{"code":409,"message":"conflict","type":"conflict"}}`)
+		case http.MethodGet:
+			_, _ = io.WriteString(w, `{"agents":[]}`)
+		}
+	})
+	if _, err := e.Create(context.Background(), agentCR("reviewer")); err == nil {
+		t.Fatal("Create succeeded although the conflicting agent could not be found")
+	}
+}
