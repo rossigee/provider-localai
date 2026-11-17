@@ -102,6 +102,14 @@ uses that ID for every later call. A Skill is identified by its `layer` and
 `name`. Deleting the resource deletes the LocalAI object; an object that is
 already gone is not an error.
 
+### Backends
+
+A Backend is a LocalAI backend installed from a gallery, named by its gallery
+entry. Creating the resource installs the backend, and the provider follows the
+install job. Deleting it uninstalls the backend. Models that use the backend
+cannot run while it is removed, so check dependent models before deleting it.
+Backend options and gallery URLs are not managed.
+
 ### Triggers
 
 A Trigger is a LocalAI chat trigger: a prompt that runs on a schedule, through a
@@ -270,6 +278,7 @@ the config import.
 | Collection | `collection.localai.m.crossplane.io/v1beta1` | Knowledge-base collections that follow URLs |
 | AgentTask | `agenttask.localai.m.crossplane.io/v1beta1` | Saved agent tasks: prompt, model, agent and enabled flag |
 | Trigger | `trigger.localai.m.crossplane.io/v1beta1` | Chat triggers that run a prompt on a schedule |
+| Backend | `backend.localai.m.crossplane.io/v1beta1` | Gallery backends installed into LocalAI |
 | Model | `model.localai.m.crossplane.io/v1beta1` | Models available to the LocalAI deployment |
 | Settings | `settings.localai.m.crossplane.io/v1beta1` | LocalAI instance settings |
 | ProviderConfig | `localai.m.crossplane.io/v1beta1` | LocalAI endpoint, API key and private CA |
