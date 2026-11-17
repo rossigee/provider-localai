@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-17
+
+### Fixed
+
+- A Settings resource whose hash was lost after Create no longer loops. Observe reads
+  LocalAI when no hash is recorded, and adopts the settings when LocalAI already holds
+  them, so the resource becomes Ready instead of posting the settings again each reconcile.
+
 ## [0.10.0] - 2026-11-17
 
 ### Added
