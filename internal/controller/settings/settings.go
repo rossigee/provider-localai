@@ -67,6 +67,17 @@ var allowedKeys = map[string]bool{
 	"debug":                             true,
 }
 
+// chatsValues are the chats_* keys a Settings resource may set, each with the
+// values it accepts. They are kept out of allowedKeys because they gate tools,
+// and every other chats_* key stays rejected. chats_tool_search only defers the
+// large tool groups behind search tools, so it can be set to any mode.
+// chats_localai_admin may only be turned off: the resource can close the LocalAI
+// admin tools but can never open them.
+var chatsValues = map[string][]any{
+	"chats_tool_search":   {"auto", "on", "off"},
+	"chats_localai_admin": {false},
+}
+
 // Setup registers the Settings controller.
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	opts := append(shared.ReconcilerOptions(o, "Settings"),
@@ -116,16 +127,34 @@ func parseSettings(raw string) (map[string]any, error) {
 		return nil, errors.New("settings must be a JSON object")
 	}
 	var rejected []string
-	for k := range out {
-		if !allowedKeys[k] {
-			rejected = append(rejected, k)
+	for k, v := range out {
+		if allowedKeys[k] {
+			continue
 		}
+		if allowed, ok := chatsValues[k]; ok {
+			if !containsValue(allowed, v) {
+				return nil, errors.Errorf("settings value not allowed for %s: %v", k, v)
+			}
+			continue
+		}
+		rejected = append(rejected, k)
 	}
 	if len(rejected) > 0 {
 		sort.Strings(rejected)
 		return nil, errors.Errorf("settings keys are not allowed: %s", strings.Join(rejected, ", "))
 	}
 	return out, nil
+}
+
+// containsValue reports whether v equals one of allowed. JSON decodes booleans
+// and strings to bool and string, which reflect.DeepEqual compares exactly.
+func containsValue(allowed []any, v any) bool {
+	for _, a := range allowed {
+		if reflect.DeepEqual(a, v) {
+			return true
+		}
+	}
+	return false
 }
 
 // settingsHash digests the canonical settings. encoding/json sorts map keys, so
