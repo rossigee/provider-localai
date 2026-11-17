@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-17
+
+### Added
+
+- A Settings resource may set two `chats_*` keys with fixed values:
+  `chats_tool_search` accepts `auto`, `on` or `off`, and `chats_localai_admin`
+  accepts `false` only, so a resource can close the LocalAI admin tools but never
+  open them. Every other `chats_*` key stays rejected.
+
 ## [0.9.1] - 2026-11-17
 
 ### Fixed
