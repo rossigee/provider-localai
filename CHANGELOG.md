@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An Agent whose name already exists in LocalAI, for example one created before
+  the external name became the LocalAI ID, is adopted instead of failing with a
+  409. Its ID is recorded, and the next reconcile updates it to the spec.
+
 ## [0.9.0] - 2026-11-17
 
 ### Added
