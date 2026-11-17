@@ -118,6 +118,29 @@ func TestParseSettingsKeepsOtherChatsKeysRejected(t *testing.T) {
 	}
 }
 
+// Create's hash can be lost when Crossplane overwrites the status it wrote. When
+// LocalAI already holds the desired settings, Observe must adopt them, not
+// report the resource missing and post them again.
+func TestObserveAdoptsSettingsAlreadyInLocalAI(t *testing.T) {
+	e := fakeLocalAI(t, http.StatusOK, nil)
+	cr := settingsCR(`{"chats_tool_search":"on","chats_localai_admin":false}`)
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	cr.Status.AtProvider.AppliedHash = ""
+
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceExists || !obs.ResourceUpToDate {
+		t.Errorf("Observe = exists %v upToDate %v, want both true", obs.ResourceExists, obs.ResourceUpToDate)
+	}
+	if cr.Status.AtProvider.AppliedHash == "" {
+		t.Error("the adopted hash was not recorded in status")
+	}
+}
+
 func TestObserveMissingUntilApplied(t *testing.T) {
 	e := fakeLocalAI(t, http.StatusOK, nil)
 	cr := settingsCR(`{"threads":8}`)

@@ -193,7 +193,18 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, err
 	}
 	if cr.Status.AtProvider.AppliedHash == "" {
-		return managed.ExternalObservation{ResourceExists: false}, nil
+		// Create records the hash in status, but Crossplane's update after Create
+		// overwrites that status, so the hash can be lost and the settings would
+		// be posted again on every reconcile. Observe keeps the status it writes,
+		// so when LocalAI already holds the desired settings, adopt them here.
+		current, err := e.current(ctx)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errGetSettings)
+		}
+		if !settingsMatch(desired, current) {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		cr.Status.AtProvider.AppliedHash = hash
 	}
 	cr.Status.SetConditions(xpv1.Available())
 	upToDate := cr.Status.AtProvider.AppliedHash == hash
