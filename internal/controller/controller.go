@@ -6,6 +6,7 @@ import (
 
 	"github.com/rossigee/provider-localai/internal/controller/agent"
 	"github.com/rossigee/provider-localai/internal/controller/agenttask"
+	"github.com/rossigee/provider-localai/internal/controller/backend"
 	"github.com/rossigee/provider-localai/internal/controller/collection"
 	"github.com/rossigee/provider-localai/internal/controller/model"
 	"github.com/rossigee/provider-localai/internal/controller/providerconfig"
@@ -33,6 +34,9 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		return err
 	}
 	if err := trigger.Setup(mgr, o); err != nil {
+		return err
+	}
+	if err := backend.Setup(mgr, o); err != nil {
 		return err
 	}
 	if err := model.Setup(mgr, o); err != nil {

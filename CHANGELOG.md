@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Backend` resource for LocalAI backends installed from a gallery. It is named
+  by its gallery entry. Creating it installs the backend, and deleting it
+  uninstalls it. Models that use the backend cannot run while it is removed.
+
 ## [0.8.0] - 2026-11-17
 
 ### Added
