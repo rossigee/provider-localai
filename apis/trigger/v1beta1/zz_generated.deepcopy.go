@@ -79,6 +79,11 @@ func (in *TriggerSpec) DeepCopyInto(out *TriggerSpec) {
 		v := *in.ForProvider.Enabled
 		out.ForProvider.Enabled = &v
 	}
+	if in.ForProvider.Acts != nil {
+		in, out := &in.ForProvider.Acts, &out.ForProvider.Acts
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 }
 
 func (in *TriggerStatus) DeepCopyInto(out *TriggerStatus) {

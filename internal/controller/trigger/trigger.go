@@ -1,7 +1,14 @@
 package trigger
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -69,12 +76,90 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI client")
 	}
-	return &external{client: laic}, nil
+	httpClient, err := clients.NewLocalAIHTTPClient(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot build LocalAI HTTP client")
+	}
+	return &external{client: laic, cfg: cfg, httpClient: httpClient}, nil
 }
 
-type external struct{ client *laiclient.Client }
+type external struct {
+	client     *laiclient.Client
+	cfg        laiclient.Config
+	httpClient *http.Client
+}
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
+
+// triggerBody is the body LocalAI expects for create and replace. It embeds
+// the client library's type and adds acts, which localai-client v0.8.0 does not
+// expose. Acts is a pointer so an explicit empty list is sent (clearing acts)
+// while an unset field is omitted.
+type triggerBody struct {
+	laiclient.TriggerWrite
+	Acts *[]string `json:"acts,omitempty"`
+}
+
+// triggerState is the response LocalAI reports. It embeds the client library's
+// type and adds acts so Observe can detect drift on it.
+type triggerState struct {
+	laiclient.Trigger
+	Acts []string `json:"acts,omitempty"`
+}
+
+// do makes an authenticated JSON request to the LocalAI API. It mirrors the
+// unexported Client.do method on laiclient.Client, which cannot be reached
+// from this package because localai-client v0.8.0 has no trigger methods that
+// carry acts.
+func (e *external) do(ctx context.Context, method, path string, body, out any) error {
+	var r io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return errors.Wrap(err, "cannot encode request body")
+		}
+		r = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(e.cfg.BaseURL, "/")+path, r)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if e.cfg.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+e.cfg.APIKey)
+	}
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	raw, err := io.ReadAll(resp.Body)
+	closeErr := resp.Body.Close()
+	if err != nil {
+		return errors.Wrap(err, "cannot read response")
+	}
+	if closeErr != nil {
+		return errors.Wrap(closeErr, "cannot close response body")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &laiclient.APIError{Method: method, Path: path, StatusCode: resp.StatusCode, Body: string(raw)}
+	}
+	if out != nil && len(raw) > 0 {
+		if err := json.Unmarshal(raw, out); err != nil {
+			return fmt.Errorf("decode: %w: %s", err, string(raw))
+		}
+	}
+	return nil
+}
+
+func (e *external) get(ctx context.Context, id string) (*triggerState, error) {
+	var t triggerState
+	if err := e.do(ctx, http.MethodGet, "/api/chats/triggers/"+url.PathEscape(id), nil, &t); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
 
 // Observe looks the trigger up by its external name, the LocalAI ID recorded at
 // creation. A trigger without an external name does not exist yet.
@@ -84,7 +169,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if id == "" {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
-	t, err := e.client.GetTrigger(ctx, id)
+	t, err := e.get(ctx, id)
 	if err != nil {
 		if laiclient.IsNotFound(err) {
 			return managed.ExternalObservation{ResourceExists: false}, nil
@@ -100,9 +185,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 // triggerUpToDate compares the fields the spec manages with what LocalAI
-// reports. An unset enabled flag is LocalAI's default, enabled, and an unset
-// daily cap is not compared.
-func triggerUpToDate(cr *triggerv1beta1.Trigger, t *laiclient.Trigger) bool {
+// reports. An unset enabled flag is LocalAI's default, enabled, an unset daily
+// cap is not compared, and unset acts leave LocalAI's value alone. Acts are
+// compared as a set: LocalAI does not promise to return them in spec order.
+func triggerUpToDate(cr *triggerv1beta1.Trigger, t *triggerState) bool {
 	p := cr.Spec.ForProvider
 	if t.Name != p.Name || t.Prompt != p.Prompt || t.Kind != p.Kind ||
 		t.Schedule != p.Schedule || t.TimeZone != p.TimeZone ||
@@ -112,6 +198,9 @@ func triggerUpToDate(cr *triggerv1beta1.Trigger, t *laiclient.Trigger) bool {
 	if p.DailyCap != 0 && t.DailyCap != p.DailyCap {
 		return false
 	}
+	if p.Acts != nil && !sameActs(p.Acts, t.Acts) {
+		return false
+	}
 	want := true
 	if p.Enabled != nil {
 		want = *p.Enabled
@@ -119,14 +208,32 @@ func triggerUpToDate(cr *triggerv1beta1.Trigger, t *laiclient.Trigger) bool {
 	return t.Enabled == want
 }
 
+// sameActs reports whether two act lists name the same acts, in any order.
+func sameActs(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[string]int, len(a))
+	for _, v := range a {
+		counts[v]++
+	}
+	for _, v := range b {
+		counts[v]--
+		if counts[v] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // triggerWrite builds the body LocalAI expects from the spec.
-func triggerWrite(cr *triggerv1beta1.Trigger) laiclient.TriggerWrite {
+func triggerWrite(cr *triggerv1beta1.Trigger) triggerBody {
 	p := cr.Spec.ForProvider
 	enabled := true
 	if p.Enabled != nil {
 		enabled = *p.Enabled
 	}
-	return laiclient.TriggerWrite{
+	body := triggerBody{TriggerWrite: laiclient.TriggerWrite{
 		Name:     p.Name,
 		Prompt:   p.Prompt,
 		Kind:     p.Kind,
@@ -136,14 +243,20 @@ func triggerWrite(cr *triggerv1beta1.Trigger) laiclient.TriggerWrite {
 		Enabled:  enabled,
 		AgentID:  p.AgentID,
 		Model:    p.Model,
+	}}
+	if p.Acts != nil {
+		acts := make([]string, len(p.Acts))
+		copy(acts, p.Acts)
+		body.Acts = &acts
 	}
+	return body
 }
 
 // Create saves the trigger and records its LocalAI ID as the external name.
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*triggerv1beta1.Trigger)
-	t, err := e.client.CreateTrigger(ctx, triggerWrite(cr))
-	if err != nil {
+	var t triggerState
+	if err := e.do(ctx, http.MethodPost, "/api/chats/triggers", triggerWrite(cr), &t); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateTrigger)
 	}
 	meta.SetExternalName(cr, t.ID)
@@ -155,7 +268,8 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 // trigger, so the full desired state is sent.
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*triggerv1beta1.Trigger)
-	if _, err := e.client.UpdateTrigger(ctx, meta.GetExternalName(cr), triggerWrite(cr)); err != nil {
+	path := "/api/chats/triggers/" + url.PathEscape(meta.GetExternalName(cr))
+	if err := e.do(ctx, http.MethodPut, path, triggerWrite(cr), nil); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateTrigger)
 	}
 	return managed.ExternalUpdate{}, nil
