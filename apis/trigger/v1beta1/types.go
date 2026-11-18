@@ -46,6 +46,13 @@ type TriggerParameters struct {
 	// Enabled, when unset, is enabled, LocalAI's default.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
+
+	// Acts are the action classes (act.files, act.addons, act.send, act.spend)
+	// a trigger run may use with nobody present. Unset leaves LocalAI's current
+	// value; an explicit empty list takes all acts away. A run with no acts is
+	// read only.
+	// +optional
+	Acts []string `json:"acts,omitempty"`
 }
 
 // TriggerObservation is the state LocalAI reports for the trigger.

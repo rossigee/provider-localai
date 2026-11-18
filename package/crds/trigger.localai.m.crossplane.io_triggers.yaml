@@ -58,6 +58,15 @@ spec:
                   TriggerParameters are the desired settings of a LocalAI chat trigger. A
                   trigger runs a prompt on a schedule, through a saved agent or a model.
                 properties:
+                  acts:
+                    description: |-
+                      Acts are the action classes (act.files, act.addons, act.send, act.spend)
+                      a trigger run may use with nobody present. Unset leaves LocalAI's current
+                      value; an explicit empty list takes all acts away. A run with no acts is
+                      read only.
+                    items:
+                      type: string
+                    type: array
                   agentId:
                     description: AgentID is the LocalAI ID of the saved agent the
                       trigger runs as.
