@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-18
+
+### Added
+
+- `acts` on `Trigger`. A scheduled trigger can now manage the action classes
+  (`act.files`, `act.addons`, `act.send`, `act.spend`, ...) it is permitted to
+  use when no user is present. Unset acts leave LocalAI's current value; an
+  explicit empty list clears them. Acts are treated as a set on drift detection.
+
 ## [0.10.1] - 2026-11-17
 
 ### Fixed
