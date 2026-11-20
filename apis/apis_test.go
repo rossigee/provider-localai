@@ -9,6 +9,7 @@ import (
 	agenttaskv1beta1 "github.com/rossigee/provider-localai/apis/agenttask/v1beta1"
 	backendv1beta1 "github.com/rossigee/provider-localai/apis/backend/v1beta1"
 	collectionv1beta1 "github.com/rossigee/provider-localai/apis/collection/v1beta1"
+	projectv1beta1 "github.com/rossigee/provider-localai/apis/project/v1beta1"
 	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
 	settingsv1beta1 "github.com/rossigee/provider-localai/apis/settings/v1beta1"
 	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
@@ -38,6 +39,8 @@ func TestAddToSchemeRegistersEveryAPIType(t *testing.T) {
 		&settingsv1beta1.SettingsList{},
 		&collectionv1beta1.Collection{},
 		&collectionv1beta1.CollectionList{},
+		&projectv1beta1.Project{},
+		&projectv1beta1.ProjectList{},
 		&agenttaskv1beta1.AgentTask{},
 		&agenttaskv1beta1.AgentTaskList{},
 		&triggerv1beta1.Trigger{},

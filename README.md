@@ -283,6 +283,7 @@ the config import.
 | Agent | `agent.localai.m.crossplane.io/v1beta1` | LocalAI agents, with model, instructions, skills, collections and MCP servers |
 | Skill | `skill.localai.m.crossplane.io/v1beta1` | Skills available to agents |
 | Collection | `collection.localai.m.crossplane.io/v1beta1` | Knowledge-base collections that follow URLs |
+| Project | `project.localai.m.crossplane.io/v1beta1` | LocalAI projects that group chats around a folder |
 | AgentTask | `agenttask.localai.m.crossplane.io/v1beta1` | Saved agent tasks: prompt, model, agent and enabled flag |
 | Trigger | `trigger.localai.m.crossplane.io/v1beta1` | Chat triggers that run a prompt on a schedule |
 | Backend | `backend.localai.m.crossplane.io/v1beta1` | Gallery backends installed into LocalAI |

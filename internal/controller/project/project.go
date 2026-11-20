@@ -1,0 +1,211 @@
+package project
+
+import (
+	"context"
+
+	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
+	laiclient "github.com/rossigee/localai-client/client"
+	projectv1beta1 "github.com/rossigee/provider-localai/apis/project/v1beta1"
+	"github.com/rossigee/provider-localai/internal/clients"
+	"github.com/rossigee/provider-localai/internal/controller/shared"
+)
+
+const (
+	errNotProject     = "managed resource is not a Project"
+	errGetProject     = "cannot get LocalAI project"
+	errCreateProject  = "cannot create LocalAI project"
+	errUpdateProject  = "cannot update LocalAI project"
+	errDeleteProject  = "cannot delete LocalAI project"
+
+	controllerName = "projects.project.localai.m.crossplane.io"
+)
+
+// Setup registers the Project controller.
+func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
+	opts := append(shared.ReconcilerOptions(o, "Project"),
+		managed.WithExternalConnector(&connector{kube: mgr.GetClient()}),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorder(controllerName))),
+	)
+	r := managed.NewReconciler(mgr,
+		resource.ManagedKind(projectv1beta1.SchemeGroupVersion.WithKind("Project")),
+		opts...,
+	)
+	return ctrl.NewControllerManagedBy(mgr).
+		Named(controllerName).
+		WithOptions(o.ForControllerRuntime()).
+		For(&projectv1beta1.Project{}).
+		Complete(r)
+}
+
+type connector struct{ kube client.Client }
+
+func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+	cr, ok := mg.(*projectv1beta1.Project)
+	if !ok {
+		return nil, errors.New(errNotProject)
+	}
+	pc, err := clients.GetProviderConfig(ctx, c.kube, cr.GetNamespace(), cr.GetProviderConfigReference())
+	if err != nil {
+		return nil, err
+	}
+	if pc.Status.GetCondition(xpv1.TypeReady).Status != corev1.ConditionTrue {
+		return nil, errors.New("provider is not ready")
+	}
+	cfg, err := clients.GetLocalAIConfig(ctx, pc, c.kube)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot build LocalAI client config")
+	}
+	laic, err := laiclient.New(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot build LocalAI client")
+	}
+	return &external{client: laic}, nil
+}
+
+type external struct{ client *laiclient.Client }
+
+func (e *external) Disconnect(_ context.Context) error { return nil }
+
+func toClientDefaults(d *projectv1beta1.ProjectDefaults) *laiclient.ProjectDefaults {
+	if d == nil {
+		return nil
+	}
+	return &laiclient.ProjectDefaults{
+		Skills:      d.Skills,
+		Addons:      d.Addons,
+		Connectors:  d.Connectors,
+		MCPServers:  d.MCPServers,
+		Collections: d.Collections,
+	}
+}
+
+func toClientAttached(a *projectv1beta1.ProjectAttached) *laiclient.ProjectAttached {
+	if a == nil {
+		return nil
+	}
+	return &laiclient.ProjectAttached{
+		Skills:      a.Skills,
+		Addons:      a.Addons,
+		Connectors:  a.Connectors,
+		MCPServers:  a.MCPServers,
+		Collections: a.Collections,
+	}
+}
+
+func fromClientProject(p *laiclient.Project) *projectv1beta1.ProjectObservation {
+	if p == nil {
+		return nil
+	}
+	return &projectv1beta1.ProjectObservation{
+		ID:        p.ID,
+		Name:      p.Name,
+		Status:    p.Status,
+		ChatCount: p.ChatCount,
+	}
+}
+
+// Observe checks that the project exists.
+func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
+	cr := mg.(*projectv1beta1.Project)
+	p := cr.Spec.ForProvider
+	proj, err := e.client.GetProject(ctx, p.Name)
+	if err != nil {
+		if laiclient.IsNotFound(err) {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
+	}
+	cr.Status.AtProvider = *fromClientProject(proj)
+	cr.Status.SetConditions(xpv1.Available())
+	return managed.ExternalObservation{
+		ResourceExists:   true,
+		ResourceUpToDate: projectUpToDate(p, proj),
+	}, nil
+}
+
+func projectUpToDate(p projectv1beta1.ProjectParameters, proj *laiclient.Project) bool {
+	if p.Name != proj.Name {
+		return false
+	}
+	if p.Description != "" && p.Description != proj.Description {
+		return false
+	}
+	return true
+}
+
+// Create makes the project.
+func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
+	cr := mg.(*projectv1beta1.Project)
+	p := cr.Spec.ForProvider
+	proj, err := e.client.CreateProject(ctx, laiclient.ProjectWrite{
+		Name:        p.Name,
+		Description: p.Description,
+		Defaults:    toClientDefaults(p.Defaults),
+		Attached:    toClientAttached(p.Attached),
+	})
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateProject)
+	}
+	cr.Status.AtProvider = *fromClientProject(proj)
+	// Handle archive if requested
+	if p.Archived != nil && *p.Archived {
+		if err := e.client.ArchiveProject(ctx, proj.ID); err != nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, errUpdateProject)
+		}
+	}
+	return managed.ExternalCreation{}, nil
+}
+
+// Update updates the project.
+func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
+	cr := mg.(*projectv1beta1.Project)
+	p := cr.Spec.ForProvider
+	id := cr.Status.AtProvider.ID
+	if id == "" {
+		id = p.Name
+	}
+	_, err := e.client.UpdateProject(ctx, id, laiclient.ProjectWrite{
+		Name:        p.Name,
+		Description: p.Description,
+		Defaults:    toClientDefaults(p.Defaults),
+		Attached:    toClientAttached(p.Attached),
+	})
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateProject)
+	}
+	// Handle archive state
+	if p.Archived != nil {
+		if *p.Archived {
+			if err := e.client.ArchiveProject(ctx, id); err != nil {
+				return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateProject)
+			}
+		} else {
+			if err := e.client.RestoreProject(ctx, id); err != nil {
+				return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateProject)
+			}
+		}
+	}
+	return managed.ExternalUpdate{}, nil
+}
+
+// Delete deletes the project.
+func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
+	cr := mg.(*projectv1beta1.Project)
+	id := cr.Status.AtProvider.ID
+	if id == "" {
+		id = cr.Spec.ForProvider.Name
+	}
+	if err := e.client.DeleteProject(ctx, id); err != nil && !laiclient.IsNotFound(err) {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteProject)
+	}
+	return managed.ExternalDelete{}, nil
+}
