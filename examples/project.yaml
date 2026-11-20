@@ -1,0 +1,11 @@
+apiVersion: project.localai.m.crossplane.io/v1beta1
+kind: Project
+metadata:
+  name: my-project
+  namespace: crossplane-system
+spec:
+  forProvider:
+    name: My Project
+    description: A project for organizing chats
+  providerConfigRef:
+    name: localai

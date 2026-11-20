@@ -5,6 +5,7 @@ import (
 	agenttaskv1beta1 "github.com/rossigee/provider-localai/apis/agenttask/v1beta1"
 	backendv1beta1 "github.com/rossigee/provider-localai/apis/backend/v1beta1"
 	collectionv1beta1 "github.com/rossigee/provider-localai/apis/collection/v1beta1"
+	projectv1beta1 "github.com/rossigee/provider-localai/apis/project/v1beta1"
 	modelv1beta1 "github.com/rossigee/provider-localai/apis/model/v1beta1"
 	settingsv1beta1 "github.com/rossigee/provider-localai/apis/settings/v1beta1"
 	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
@@ -19,6 +20,7 @@ func init() {
 		backendv1beta1.AddToScheme,
 		agenttaskv1beta1.AddToScheme,
 		collectionv1beta1.AddToScheme,
+		projectv1beta1.AddToScheme,
 		skillv1beta1.AddToScheme,
 		modelv1beta1.AddToScheme,
 		settingsv1beta1.AddToScheme,

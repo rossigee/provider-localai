@@ -8,6 +8,7 @@ import (
 	"github.com/rossigee/provider-localai/internal/controller/agenttask"
 	"github.com/rossigee/provider-localai/internal/controller/backend"
 	"github.com/rossigee/provider-localai/internal/controller/collection"
+	"github.com/rossigee/provider-localai/internal/controller/project"
 	"github.com/rossigee/provider-localai/internal/controller/model"
 	"github.com/rossigee/provider-localai/internal/controller/providerconfig"
 	"github.com/rossigee/provider-localai/internal/controller/settings"
@@ -28,6 +29,9 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		return err
 	}
 	if err := collection.Setup(mgr, o); err != nil {
+		return err
+	}
+	if err := project.Setup(mgr, o); err != nil {
 		return err
 	}
 	if err := agenttask.Setup(mgr, o); err != nil {
