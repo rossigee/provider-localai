@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `sourceChatId` on `Trigger`. A trigger can now be bound to the saved chat it
+  inherits its skill, MCP and built-in switch state from, matching LocalAI's
+  `source_chat_id`. Unset manages nothing; once set, the provider sends it on
+  create/update and compares it on drift. Removes the need to maintain the
+  binding out of band.
+
 ## [0.12.0] - 2026-11-20
 
 ### Added
