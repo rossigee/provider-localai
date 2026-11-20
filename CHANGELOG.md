@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-20
+
 ### Added
 
 - `sourceChatId` on `Trigger`. A trigger can now be bound to the saved chat it
