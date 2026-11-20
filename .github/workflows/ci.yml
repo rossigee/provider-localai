@@ -24,7 +24,6 @@ permissions:
   contents: read
   packages: write  # Needed for security scanning uploads
   id-token: write  # Needed for OIDC
-  actions: read    # Needed for detecting duplicate actions
 
 env:
   GO_VERSION: '1.27.4'
@@ -33,23 +32,9 @@ env:
   DOCKER_BUILDX_VERSION: 'v0.11.2'
 
 jobs:
-  detect-noop:
-    runs-on: ubuntu-24.04
-    outputs:
-      noop: ${{ steps.noop.outputs.should_skip }}
-    steps:
-      - name: Detect No-op Changes
-        id: noop
-        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          paths_ignore: '["**.md", "**.png", "**.jpg"]'
-          do_not_skip: '["workflow_dispatch", "schedule", "push"]'
 
   lint:
     runs-on: ubuntu-24.04
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -70,8 +55,6 @@ jobs:
 
   check-diff:
     runs-on: ubuntu-24.04
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -98,8 +81,6 @@ jobs:
 
   unit-tests:
     runs-on: ubuntu-24.04
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -128,8 +109,6 @@ jobs:
 
   security-scan:
     runs-on: ubuntu-24.04
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
     permissions:
       contents: read
       security-events: write
