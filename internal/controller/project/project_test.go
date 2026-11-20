@@ -87,3 +87,103 @@ func TestDeleteProject(t *testing.T) {
 		t.Fatalf("Delete: %v", err)
 	}
 }
+
+func TestDeleteProjectNotFound(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	cr := projectCR("My Project")
+	cr.Status.AtProvider.ID = "myproj"
+	_, err := e.Delete(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Delete (not found) should succeed, got: %v", err)
+	}
+}
+
+func TestUpdateProject(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			_, _ = io.WriteString(w, `{"id":"myproj","name":"My Project","status":"active"}`)
+			return
+		}
+	})
+	cr := projectCR("My Project")
+	cr.Status.AtProvider.ID = "myproj"
+	_, err := e.Update(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+}
+
+func TestUpdateProjectArchive(t *testing.T) {
+	var gotArchive bool
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			_, _ = io.WriteString(w, `{"id":"myproj","name":"My Project","status":"active"}`)
+			return
+		}
+		if r.Method == http.MethodPost && r.URL.Path == "/api/chats/projects/myproj/archive" {
+			gotArchive = true
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	})
+	cr := projectCR("My Project")
+	cr.Status.AtProvider.ID = "myproj"
+	archived := true
+	cr.Spec.ForProvider.Archived = &archived
+	_, err := e.Update(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Update (archive): %v", err)
+	}
+	if !gotArchive {
+		t.Error("expected archive call")
+	}
+}
+
+func TestUpdateProjectRestore(t *testing.T) {
+	var gotRestore bool
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			_, _ = io.WriteString(w, `{"id":"myproj","name":"My Project","status":"active"}`)
+			return
+		}
+		if r.Method == http.MethodPost && r.URL.Path == "/api/chats/projects/myproj/restore" {
+			gotRestore = true
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	})
+	cr := projectCR("My Project")
+	cr.Status.AtProvider.ID = "myproj"
+	archived := false
+	cr.Spec.ForProvider.Archived = &archived
+	_, err := e.Update(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Update (restore): %v", err)
+	}
+	if !gotRestore {
+		t.Error("expected restore call")
+	}
+}
+
+func TestObserveProjectError(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	_, err := e.Observe(context.Background(), projectCR("myproj"))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateProjectError(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	cr := projectCR("My Project")
+	_, err := e.Create(context.Background(), cr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
