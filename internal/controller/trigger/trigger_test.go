@@ -268,3 +268,87 @@ func TestDeleteToleratesMissingTrigger(t *testing.T) {
 		t.Fatalf("Delete of a missing trigger returned %v, want nil", err)
 	}
 }
+
+func TestObserveSourceChat(t *testing.T) {
+	cases := []struct {
+		name     string
+		set      string
+		held     string
+		upToDate bool
+	}{
+		{"matching source chat", "e85b653005ed9ac6fcab795f", "e85b653005ed9ac6fcab795f", true},
+		{"drifted source chat", "e85b653005ed9ac6fcab795f", "aaaaaaaaaaaaaaaaaaaaaaaa", false},
+		{"unset is unmanaged", "", "e85b653005ed9ac6fcab795f", true},
+		{"missing on the server drifts", "e85b653005ed9ac6fcab795f", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := ""
+			if tc.held != "" {
+				src = `,"source_chat_id":"` + tc.held + `"`
+			}
+			e := triggerExternal(t, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.WriteString(w, `{"id":"tr1","name":"digest","prompt":"Summarise the inbox","kind":"schedule","schedule":"daily 08:00","enabled":true`+src+`}`)
+			})
+			cr := triggerCR()
+			cr.Spec.ForProvider.SourceChatID = tc.set
+			meta.SetExternalName(cr, "tr1")
+			obs, err := e.Observe(context.Background(), cr)
+			if err != nil {
+				t.Fatalf("Observe: %v", err)
+			}
+			if !obs.ResourceExists || obs.ResourceUpToDate != tc.upToDate {
+				t.Errorf("observe = %+v, want upToDate %v", obs, tc.upToDate)
+			}
+		})
+	}
+}
+
+func TestCreateSendsSourceChatID(t *testing.T) {
+	e := triggerExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		body := readBody(t, r)
+		if body["source_chat_id"] != "e85b653005ed9ac6fcab795f" {
+			t.Errorf("source_chat_id = %v, want e85b653005ed9ac6fcab795f", body["source_chat_id"])
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"id":"tr9","enabled":true}`)
+	})
+	cr := triggerCR()
+	cr.Spec.ForProvider.SourceChatID = "e85b653005ed9ac6fcab795f"
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+}
+
+func TestCreateOmitsUnsetSourceChatID(t *testing.T) {
+	e := triggerExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		body := readBody(t, r)
+		if _, ok := body["source_chat_id"]; ok {
+			t.Errorf("unset source chat id was sent as %v", body["source_chat_id"])
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"id":"tr9","enabled":true}`)
+	})
+	if _, err := e.Create(context.Background(), triggerCR()); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+}
+
+func TestUpdateSendsSourceChatID(t *testing.T) {
+	e := triggerExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/api/chats/triggers/tr1" {
+			t.Errorf("request = %s %s, want PUT /api/chats/triggers/tr1", r.Method, r.URL.Path)
+		}
+		body := readBody(t, r)
+		if body["source_chat_id"] != "e85b653005ed9ac6fcab795f" {
+			t.Errorf("source_chat_id = %v, want e85b653005ed9ac6fcab795f", body["source_chat_id"])
+		}
+		_, _ = io.WriteString(w, `{"id":"tr1","enabled":true}`)
+	})
+	cr := triggerCR()
+	cr.Spec.ForProvider.SourceChatID = "e85b653005ed9ac6fcab795f"
+	meta.SetExternalName(cr, "tr1")
+	if _, err := e.Update(context.Background(), cr); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+}

@@ -92,19 +92,22 @@ type external struct {
 func (e *external) Disconnect(_ context.Context) error { return nil }
 
 // triggerBody is the body LocalAI expects for create and replace. It embeds
-// the client library's type and adds acts, which localai-client v0.8.0 does not
-// expose. Acts is a pointer so an explicit empty list is sent (clearing acts)
-// while an unset field is omitted.
+// the client library's type and adds acts and source_chat_id, which
+// localai-client does not expose. Acts is a pointer so an explicit empty list
+// is sent (clearing acts) while an unset field is omitted. SourceChatID is
+// sent only when set; empty means the provider does not manage the source chat.
 type triggerBody struct {
 	laiclient.TriggerWrite
-	Acts *[]string `json:"acts,omitempty"`
+	Acts         *[]string `json:"acts,omitempty"`
+	SourceChatID string    `json:"source_chat_id,omitempty"`
 }
 
 // triggerState is the response LocalAI reports. It embeds the client library's
-// type and adds acts so Observe can detect drift on it.
+// type and adds acts and the source chat so Observe can detect drift.
 type triggerState struct {
 	laiclient.Trigger
-	Acts []string `json:"acts,omitempty"`
+	Acts         []string `json:"acts,omitempty"`
+	SourceChatID string   `json:"source_chat_id,omitempty"`
 }
 
 // do makes an authenticated JSON request to the LocalAI API. It mirrors the
@@ -201,6 +204,9 @@ func triggerUpToDate(cr *triggerv1beta1.Trigger, t *triggerState) bool {
 	if p.Acts != nil && !sameActs(p.Acts, t.Acts) {
 		return false
 	}
+	if p.SourceChatID != "" && t.SourceChatID != p.SourceChatID {
+		return false
+	}
 	want := true
 	if p.Enabled != nil {
 		want = *p.Enabled
@@ -248,6 +254,9 @@ func triggerWrite(cr *triggerv1beta1.Trigger) triggerBody {
 		acts := make([]string, len(p.Acts))
 		copy(acts, p.Acts)
 		body.Acts = &acts
+	}
+	if p.SourceChatID != "" {
+		body.SourceChatID = p.SourceChatID
 	}
 	return body
 }

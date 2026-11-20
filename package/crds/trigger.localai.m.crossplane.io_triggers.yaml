@@ -97,6 +97,15 @@ spec:
                     description: Schedule is a LocalAI schedule expression, such as
                       "daily 08:00".
                     type: string
+                  sourceChatId:
+                    description: |-
+                      SourceChatID is the ID of a saved chat whose skill, MCP and built-in
+                      switches each trigger run inherits. LocalAI stores it as source_chat_id
+                      on the trigger. Leave it unset to manage no source chat; a trigger with
+                      no source chat runs with the default switch set. LocalAI's trigger
+                      update is a full replace, so once this is set the provider sends it on
+                      every update and compares it on drift.
+                    type: string
                   timeZone:
                     description: TimeZone is the IANA time zone the schedule is read
                       in.

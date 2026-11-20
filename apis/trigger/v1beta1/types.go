@@ -53,6 +53,15 @@ type TriggerParameters struct {
 	// read only.
 	// +optional
 	Acts []string `json:"acts,omitempty"`
+
+	// SourceChatID is the ID of a saved chat whose skill, MCP and built-in
+	// switches each trigger run inherits. LocalAI stores it as source_chat_id
+	// on the trigger. Leave it unset to manage no source chat; a trigger with
+	// no source chat runs with the default switch set. LocalAI's trigger
+	// update is a full replace, so once this is set the provider sends it on
+	// every update and compares it on drift.
+	// +optional
+	SourceChatID string `json:"sourceChatId,omitempty"`
 }
 
 // TriggerObservation is the state LocalAI reports for the trigger.
