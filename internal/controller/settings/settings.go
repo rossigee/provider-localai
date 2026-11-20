@@ -47,6 +47,14 @@ const (
 // autoload_*), open a network (p2p_*, federated, mcp_connectors_allow_private),
 // or enable tools (chats_*, client_jobs_allow_all_tools). Add a key here only
 // after deciding it cannot be used to reach credentials or remote hosts.
+//
+// blockedKeys are keys LocalAI rejects on /api/settings because they are managed
+// elsewhere (e.g. on the add-on owner). They are reported with a specific
+// message rather than the generic "not allowed" one.
+var blockedKeys = map[string]string{
+	"auto_upgrade_addons": "auto_upgrade_addons is set on the add-on owner, not through /api/settings",
+}
+
 var allowedKeys = map[string]bool{
 	"watchdog_enabled":                  true,
 	"watchdog_idle_enabled":             true,
@@ -128,6 +136,9 @@ func parseSettings(raw string) (map[string]any, error) {
 	}
 	var rejected []string
 	for k, v := range out {
+		if msg, ok := blockedKeys[k]; ok {
+			return nil, errors.New(msg)
+		}
 		if allowedKeys[k] {
 			continue
 		}
