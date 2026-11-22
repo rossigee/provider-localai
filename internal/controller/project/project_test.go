@@ -9,6 +9,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	laiclient "github.com/rossigee/localai-client/client"
 	projectv1beta1 "github.com/rossigee/provider-localai/apis/project/v1beta1"
 )
@@ -35,6 +36,10 @@ func projectExternal(t *testing.T, h http.HandlerFunc) *external {
 
 func TestObserveMissingProjectDoesNotExist(t *testing.T) {
 	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/chats/projects" {
+			_, _ = io.WriteString(w, `{"projects":[]}`)
+			return
+		}
 		w.WriteHeader(http.StatusNotFound)
 	})
 	obs, err := e.Observe(context.Background(), projectCR("myproj"))
@@ -48,9 +53,15 @@ func TestObserveMissingProjectDoesNotExist(t *testing.T) {
 
 func TestObserveExistingProjectExists(t *testing.T) {
 	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, `{"id":"myproj","name":"My Project","status":"active","chat_count":0}`)
+		if r.URL.Path == "/api/chats/projects/myproj" {
+			_, _ = io.WriteString(w, `{"id":"myproj","name":"My Project","status":"active","chat_count":0}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
 	})
-	obs, err := e.Observe(context.Background(), projectCR("My Project"))
+	cr := projectCR("My Project")
+	meta.SetExternalName(cr, "myproj")
+	obs, err := e.Observe(context.Background(), cr)
 	if err != nil {
 		t.Fatalf("Observe: %v", err)
 	}
@@ -59,9 +70,30 @@ func TestObserveExistingProjectExists(t *testing.T) {
 	}
 }
 
+func TestObserveAdoptsByName(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/chats/projects" {
+			_, _ = io.WriteString(w, `{"projects":[{"id":"p1","name":"My Project","status":"active"}]}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	cr := projectCR("My Project")
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceExists {
+		t.Errorf("ResourceExists = false, want true")
+	}
+	if meta.GetExternalName(cr) != "p1" {
+		t.Errorf("external-name = %q, want p1", meta.GetExternalName(cr))
+	}
+}
+
 func TestCreateProject(t *testing.T) {
 	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/chats/projects" {
 			_, _ = io.WriteString(w, `{"id":"myproj","name":"My Project","status":"active"}`)
 			return
 		}
@@ -70,6 +102,31 @@ func TestCreateProject(t *testing.T) {
 	_, err := e.Create(context.Background(), cr)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
+	}
+	if meta.GetExternalName(cr) != "myproj" {
+		t.Errorf("external-name = %q, want myproj", meta.GetExternalName(cr))
+	}
+}
+
+func TestCreateProjectAdoptsExisting(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/chats/projects" {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(w, `{"error":"boom"}`)
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/api/chats/projects" {
+			_, _ = io.WriteString(w, `{"projects":[{"id":"p1","name":"My Project","status":"active"}]}`)
+			return
+		}
+	})
+	cr := projectCR("My Project")
+	_, err := e.Create(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if meta.GetExternalName(cr) != "p1" {
+		t.Errorf("external-name = %q, want p1", meta.GetExternalName(cr))
 	}
 }
 
@@ -171,7 +228,9 @@ func TestObserveProjectError(t *testing.T) {
 	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
-	_, err := e.Observe(context.Background(), projectCR("myproj"))
+	cr := projectCR("myproj")
+	meta.SetExternalName(cr, "myproj")
+	_, err := e.Observe(context.Background(), cr)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -179,7 +238,14 @@ func TestObserveProjectError(t *testing.T) {
 
 func TestCreateProjectError(t *testing.T) {
 	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
+		if r.Method == http.MethodPost && r.URL.Path == "/api/chats/projects" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/api/chats/projects" {
+			_, _ = io.WriteString(w, `{"projects":[]}`)
+			return
+		}
 	})
 	cr := projectCR("My Project")
 	_, err := e.Create(context.Background(), cr)
