@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-22
+
+### Fixed
+
+- `Project` managed resource: `Observe` now resolves the project by external-name (LocalAI project ID) when set, falling back to a name-based list lookup for adoption of pre-existing projects. `Create` sets external-name from the created project's ID and adopts an existing project with the same name instead of failing when the create call errors.
+
 ## [0.13.0] - 2026-11-22
 
 ### Fixed
