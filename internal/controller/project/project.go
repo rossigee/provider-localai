@@ -5,6 +5,7 @@ import (
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
@@ -113,16 +114,31 @@ func fromClientProject(p *laiclient.Project) *projectv1beta1.ProjectObservation 
 	}
 }
 
-// Observe checks that the project exists.
+// Observe checks that the project exists. Uses external-name (LocalAI project ID)
+// when set; falls back to name lookup for adoption of pre-existing projects.
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr := mg.(*projectv1beta1.Project)
 	p := cr.Spec.ForProvider
-	proj, err := e.client.GetProject(ctx, p.Name)
-	if err != nil {
-		if laiclient.IsNotFound(err) {
+	id := meta.GetExternalName(cr)
+	var proj *laiclient.Project
+	var err error
+	if id != "" {
+		proj, err = e.client.GetProject(ctx, id)
+		if err != nil {
+			if laiclient.IsNotFound(err) {
+				return managed.ExternalObservation{ResourceExists: false}, nil
+			}
+			return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
+		}
+	} else {
+		proj, err = e.findProjectByName(ctx, p.Name)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
+		}
+		if proj == nil {
 			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
+		meta.SetExternalName(cr, proj.ID)
 	}
 	cr.Status.AtProvider = *fromClientProject(proj)
 	cr.Status.SetConditions(xpv1.Available())
@@ -130,6 +146,19 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		ResourceExists:   true,
 		ResourceUpToDate: projectUpToDate(p, proj),
 	}, nil
+}
+
+func (e *external) findProjectByName(ctx context.Context, name string) (*laiclient.Project, error) {
+	projects, err := e.client.ListProjects(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range projects {
+		if projects[i].Name == name {
+			return &projects[i], nil
+		}
+	}
+	return nil, nil
 }
 
 func projectUpToDate(p projectv1beta1.ProjectParameters, proj *laiclient.Project) bool {
@@ -153,8 +182,16 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		Attached:    toClientAttached(p.Attached),
 	})
 	if err != nil {
+		// If the project already exists by name, adopt it instead of creating duplicates.
+		existing, lerr := e.findProjectByName(ctx, p.Name)
+		if lerr == nil && existing != nil {
+			meta.SetExternalName(cr, existing.ID)
+			cr.Status.AtProvider = *fromClientProject(existing)
+			return managed.ExternalCreation{}, nil
+		}
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateProject)
 	}
+	meta.SetExternalName(cr, proj.ID)
 	cr.Status.AtProvider = *fromClientProject(proj)
 	// Handle archive if requested
 	if p.Archived != nil && *p.Archived {
