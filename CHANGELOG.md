@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Settings` managed resource: the instance branding keys
+  `instance_name`, `instance_tagline`, `logo_file`, `logo_horizontal_file` and
+  `favicon_file` are now allowed. The branding filename keys are validated as
+  plain basenames (no path separators, no leading `.`/`..`); an empty string
+  clears the custom asset back to LocalAI's built-in default. Previously these
+  keys were rejected, so there was no managed way to set the instance name or
+  logo.
+
 ## [0.13.1] - 2026-11-22
 
 ### Fixed

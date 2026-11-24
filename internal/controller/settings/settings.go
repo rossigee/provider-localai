@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -86,6 +87,58 @@ var chatsValues = map[string][]any{
 	"chats_localai_admin": {false},
 }
 
+// brandingKeys are the LocalAI instance branding settings: the name and
+// tagline shown on the login page, and the uploaded logo/favicon files
+// served at /branding/asset/<kind>. They carry no credentials and cannot
+// reach remote hosts: the filename keys are validated to a safe basename
+// (no path separators, traversal or control characters) so a Settings
+// resource cannot point LocalAI at a file outside the branding directory.
+const (
+	brandingFilenameMaxLen = 128
+	brandingTextMaxLen     = 256
+)
+
+var brandingKeys = map[string]string{
+	"instance_name":        "text",
+	"instance_tagline":     "text",
+	"logo_file":            "filename",
+	"logo_horizontal_file": "filename",
+	"favicon_file":         "filename",
+}
+
+// validateBrandingValue checks a branding value. A "filename" must be a
+// plain basename: no path separators, no "." or "..", no control characters,
+// at most 128 characters. An empty string is accepted as a reset to the
+// LocalAI default branding. A "text" value is free text, at most 256
+// characters, with no control characters.
+func validateBrandingValue(key, kind string, v any) error {
+	s, ok := v.(string)
+	if !ok {
+		return errors.New("value must be a string")
+	}
+	if kind == "filename" {
+		if len(s) > brandingFilenameMaxLen {
+			return fmt.Errorf("filename must be at most %d characters", brandingFilenameMaxLen)
+		}
+		if s != "" {
+			if strings.ContainsAny(s, "/\\") {
+				return errors.New("filename must not contain path separators")
+			}
+			if s == "." || s == ".." {
+				return errors.New("filename must not be . or ..")
+			}
+		}
+	} else if len(s) > brandingTextMaxLen {
+		return fmt.Errorf("value must be at most %d characters", brandingTextMaxLen)
+	}
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			return errors.New("value contains control characters")
+		}
+	}
+	return nil
+}
+
 // Setup registers the Settings controller.
 func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 	opts := append(shared.ReconcilerOptions(o, "Settings"),
@@ -140,6 +193,12 @@ func parseSettings(raw string) (map[string]any, error) {
 			return nil, errors.New(msg)
 		}
 		if allowedKeys[k] {
+			continue
+		}
+		if kind, ok := brandingKeys[k]; ok {
+			if err := validateBrandingValue(k, kind, v); err != nil {
+				return nil, errors.Wrapf(err, "settings key %q", k)
+			}
 			continue
 		}
 		if allowed, ok := chatsValues[k]; ok {

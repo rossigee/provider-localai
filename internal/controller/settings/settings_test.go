@@ -299,3 +299,43 @@ func settingsHashFor(t *testing.T, raw string) string {
 	}
 	return h
 }
+
+func TestParseSettingsAcceptsBrandingKeys(t *testing.T) {
+	for _, raw := range []string{
+		`{"instance_name":"Egon"}`,
+		`{"instance_tagline":"Busting infra ghosts"}`,
+		`{"logo_file":"logo.png"}`,
+		`{"logo_horizontal_file":"logo-horizontal.svg"}`,
+		`{"favicon_file":"favicon.ico"}`,
+		`{"logo_file":""}`,
+		`{"instance_name":"","instance_tagline":"","logo_file":"","logo_horizontal_file":"","favicon_file":""}`,
+		`{"instance_name":"Egon","instance_tagline":"Busting infra ghosts","logo_file":"logo.png","logo_horizontal_file":"logo-horizontal.svg","favicon_file":"favicon.ico"}`,
+	} {
+		if _, err := parseSettings(raw); err != nil {
+			t.Errorf("parseSettings(%s): %v, want accepted", raw, err)
+		}
+	}
+}
+
+func TestParseSettingsRejectsBadBrandingValues(t *testing.T) {
+	for _, raw := range []string{
+		`{"instance_name":123}`,
+		`{"instance_name":true}`,
+		`{"instance_tagline":["a"]}`,
+		`{"logo_file":{"x":"y"}}`,
+		`{"logo_file":"../secret.txt"}`,
+		`{"logo_file":"subdir/logo.png"}`,
+		`{"logo_file":"\\logo.png"}`,
+		`{"logo_file":"."}`,
+		`{"logo_file":".."}`,
+		`{"favicon_file":"a\u0000b.png"}`,
+		`{"favicon_file":"a\u000ab.png"}`,
+		`{"instance_name":"with\u0000control"}`,
+		`{"instance_name":"` + strings.Repeat("x", 257) + `"}`,
+		`{"logo_file":"` + strings.Repeat("x", 129) + `.png"}`,
+	} {
+		if _, err := parseSettings(raw); err == nil {
+			t.Errorf("parseSettings(%s) succeeded, want rejection", raw)
+		}
+	}
+}

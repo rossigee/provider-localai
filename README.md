@@ -162,7 +162,11 @@ A Settings resource applies LocalAI runtime settings through `POST /api/settings
 settings, so only the keys given change. `examples/settings.yaml` shows one.
 
 Only allow-listed keys are accepted. The list is in `internal/controller/settings`.
-It covers watchdog, VRAM, eviction, thread and context tuning, and `debug`.
+It covers watchdog, VRAM, eviction, thread and context tuning, `debug`, and the
+instance branding: `instance_name`, `instance_tagline`, `logo_file`,
+`logo_horizontal_file` and `favicon_file`. The branding filename keys must be
+plain basenames (no path separators); an empty string clears the custom asset
+back to the built-in default.
 Keys that control authentication or cross-origin access (`api_keys`, `csrf`,
 `cors`, `cors_allow_origins`), make LocalAI fetch remote content (`galleries`,
 `autoload_*`), open a network (`p2p_*`, `federated`), or enable tools (`chats_*`)

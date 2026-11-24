@@ -13,6 +13,13 @@ type SettingsParameters struct {
 	// POST /api/settings, which LocalAI merges into its saved settings, so only
 	// the keys given here change. Only keys on the provider's allow-list are
 	// accepted; security-sensitive keys such as api_keys are rejected.
+	//
+	// The list covers runtime tuning (watchdog, VRAM, eviction, thread and
+	// context tuning, debug) and the instance branding: instance_name,
+	// instance_tagline, logo_file, logo_horizontal_file and favicon_file.
+	// The branding filename keys must be plain basenames (no separators or
+	// traversal); an empty string clears the custom asset back to the
+	// built-in default.
 	// +kubebuilder:validation:Required
 	Settings string `json:"settings"`
 }
