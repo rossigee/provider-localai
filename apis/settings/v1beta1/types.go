@@ -14,12 +14,14 @@ type SettingsParameters struct {
 	// the keys given here change. Only keys on the provider's allow-list are
 	// accepted; security-sensitive keys such as api_keys are rejected.
 	//
-	// The list covers runtime tuning (watchdog, VRAM, eviction, thread and
-	// context tuning, debug) and the instance branding: instance_name,
-	// instance_tagline, logo_file, logo_horizontal_file and favicon_file.
-	// The branding filename keys must be plain basenames (no separators or
-	// traversal); an empty string clears the custom asset back to the
-	// built-in default.
+	// The list covers runtime tuning (watchdog, memory reclaimer, VRAM,
+	// eviction, thread/context tuning, debug), page and UI toggles
+	// (home_page_area_enabled, shared_pages_enabled, user_page_shares_enabled),
+	// tracing bounds (tracing_max_items, tracing_max_body_bytes) and the
+	// instance branding (instance_name, instance_tagline, logo_file,
+	// logo_horizontal_file and favicon_file). Branding filename keys must be
+	// plain basenames (no separators or traversal); an empty string clears the
+	// custom asset back to the built-in default. Keys are type-checked.
 	// +kubebuilder:validation:Required
 	Settings string `json:"settings"`
 }

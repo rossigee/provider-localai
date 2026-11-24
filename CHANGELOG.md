@@ -9,13 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Settings` managed resource: the instance branding keys
-  `instance_name`, `instance_tagline`, `logo_file`, `logo_horizontal_file` and
-  `favicon_file` are now allowed. The branding filename keys are validated as
-  plain basenames (no path separators, no leading `.`/`..`); an empty string
-  clears the custom asset back to LocalAI's built-in default. Previously these
-  keys were rejected, so there was no managed way to set the instance name or
-  logo.
+- `Settings` managed resource: instance, runtime and page settings that were
+  previously rejected are now accepted:
+  - Branding: `instance_name`, `instance_tagline`, `logo_file`,
+    `logo_horizontal_file`, `favicon_file`. The filename keys must be plain
+    basenames (no path separators); an empty string resets to the built-in
+    default.
+  - Typed tuning keys: `memory_reclaimer_enabled`, `memory_reclaimer_threshold`
+    (0..1), `size_aware_eviction`, `distributed_disk_headroom_check`,
+    `open_responses_store_ttl` (Go duration), `tracing_max_items`,
+    `tracing_max_body_bytes`, `max_concurrent_model_operations`,
+    `watchdog_interval`.
+  - Page/UI toggles: `home_page_area_enabled`, `shared_pages_enabled`,
+    `user_page_shares_enabled`.
+- `Settings` values are now type-checked for the typed keys above, so a
+  mistyped value is rejected with a clear error instead of being silently
+  ignored by LocalAI.
 
 ## [0.13.1] - 2026-11-22
 

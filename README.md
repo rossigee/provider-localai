@@ -162,11 +162,18 @@ A Settings resource applies LocalAI runtime settings through `POST /api/settings
 settings, so only the keys given change. `examples/settings.yaml` shows one.
 
 Only allow-listed keys are accepted. The list is in `internal/controller/settings`.
-It covers watchdog, VRAM, eviction, thread and context tuning, `debug`, and the
-instance branding: `instance_name`, `instance_tagline`, `logo_file`,
-`logo_horizontal_file` and `favicon_file`. The branding filename keys must be
-plain basenames (no path separators); an empty string clears the custom asset
-back to the built-in default.
+It covers runtime tuning (`watchdog_*`, `threads`, `context_size`, `f16`,
+`vram_budget`, `vram_persistent_cache`, eviction/memory-reclaimer keys,
+`artifact_download_concurrency`, `max_concurrent_*`, `tracing_max_items`,
+`tracing_max_body_bytes`), page/UI toggles (`home_page_area_enabled`,
+`shared_pages_enabled`, `user_page_shares_enabled`), response-store retention
+(`open_responses_store_ttl`), `debug`, and the instance branding
+(`instance_name`, `instance_tagline`, `logo_file`, `logo_horizontal_file`,
+`favicon_file`). Branding filename keys must be plain basenames (no path
+separators); an empty string resets to the built-in default. Keys are
+type-checked: booleans, 0-1 fractions, non-negative integers and Go duration
+strings are validated, so a wrong-typed value is rejected rather than silently
+ignored.
 Keys that control authentication or cross-origin access (`api_keys`, `csrf`,
 `cors`, `cors_allow_origins`), make LocalAI fetch remote content (`galleries`,
 `autoload_*`), open a network (`p2p_*`, `federated`), or enable tools (`chats_*`)

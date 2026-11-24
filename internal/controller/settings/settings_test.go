@@ -339,3 +339,51 @@ func TestParseSettingsRejectsBadBrandingValues(t *testing.T) {
 		}
 	}
 }
+
+func TestParseSettingsAcceptsTuningKeys(t *testing.T) {
+	for _, raw := range []string{
+		`{"memory_reclaimer_enabled":true}`,
+		`{"memory_reclaimer_threshold":0.95}`,
+		`{"memory_reclaimer_threshold":0}`,
+		`{"memory_reclaimer_threshold":1}`,
+		`{"size_aware_eviction":true}`,
+		`{"distributed_disk_headroom_check":true}`,
+		`{"home_page_area_enabled":false}`,
+		`{"shared_pages_enabled":false}`,
+		`{"user_page_shares_enabled":false}`,
+		`{"open_responses_store_ttl":"1h"}`,
+		`{"open_responses_store_ttl":"0"}`,
+		`{"tracing_max_items":1000}`,
+		`{"tracing_max_body_bytes":0}`,
+		`{"max_concurrent_model_operations":2}`,
+		`{"watchdog_interval":"30s"}`,
+	} {
+		if _, err := parseSettings(raw); err != nil {
+			t.Errorf("parseSettings(%s): %v, want accepted", raw, err)
+		}
+	}
+}
+
+func TestParseSettingsRejectsBadTuningValues(t *testing.T) {
+	for _, raw := range []string{
+		`{"memory_reclaimer_enabled":"true"}`,
+		`{"memory_reclaimer_threshold":1.5}`,
+		`{"memory_reclaimer_threshold":-0.1}`,
+		`{"memory_reclaimer_threshold":"0.9"}`,
+		`{"tracing_max_items":-1}`,
+		`{"tracing_max_items":1.5}`,
+		`{"tracing_max_items":"1000"}`,
+		`{"tracing_max_body_bytes":"big"}`,
+		`{"open_responses_store_ttl":"bogus"}`,
+		`{"open_responses_store_ttl":"-5m"}`,
+		`{"open_responses_store_ttl":30}`,
+		`{"open_responses_store_ttl":""}`,
+		`{"watchdog_interval":""}`,
+		`{"watchdog_interval":42}`,
+		`{"home_page_area_enabled":"yes"}`,
+	} {
+		if _, err := parseSettings(raw); err == nil {
+			t.Errorf("parseSettings(%s) succeeded, want rejection", raw)
+		}
+	}
+}
