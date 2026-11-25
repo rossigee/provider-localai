@@ -34,6 +34,24 @@ type ProjectAttached struct {
 	Collections []string `json:"collections,omitempty"`
 }
 
+// ProjectAccessGrant gives an OIDC group access to a project.
+type ProjectAccessGrant struct {
+	// Name is the OIDC group name.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// Mode is read or write. Defaults to read.
+	// +optional
+	// +kubebuilder:validation:Enum=read;write
+	Mode string `json:"mode,omitempty"`
+}
+
+// ProjectAccess declares access grants for the project.
+type ProjectAccess struct {
+	// Groups are OIDC group access grants.
+	// +optional
+	Groups []ProjectAccessGrant `json:"groups,omitempty"`
+}
+
 // ProjectParameters are the desired settings of a LocalAI project.
 type ProjectParameters struct {
 	// Name is the project's name in LocalAI.
@@ -57,6 +75,10 @@ type ProjectParameters struct {
 	// Attached are the always-on (attached) tools for the project.
 	// +optional
 	Attached *ProjectAttached `json:"attached,omitempty"`
+
+	// Access declares OIDC group access grants for the project.
+	// +optional
+	Access *ProjectAccess `json:"access,omitempty"`
 
 	// Archived, when set to true, archives the project.
 	// +optional

@@ -102,6 +102,17 @@ func toClientAttached(a *projectv1beta1.ProjectAttached) *laiclient.ProjectAttac
 	}
 }
 
+func toClientAccess(a *projectv1beta1.ProjectAccess) *laiclient.ProjectAccess {
+	if a == nil {
+		return nil
+	}
+	out := &laiclient.ProjectAccess{Groups: make([]laiclient.ProjectAccessGrant, 0, len(a.Groups))}
+	for _, g := range a.Groups {
+		out.Groups = append(out.Groups, laiclient.ProjectAccessGrant{Name: g.Name, Mode: g.Mode})
+	}
+	return out
+}
+
 func fromClientProject(p *laiclient.Project) *projectv1beta1.ProjectObservation {
 	if p == nil {
 		return nil
@@ -169,6 +180,34 @@ func projectUpToDate(p projectv1beta1.ProjectParameters, proj *laiclient.Project
 	if p.Description != "" && p.Description != proj.Description {
 		return false
 	}
+	if p.Access != nil {
+		want := map[string]string{}
+		for _, g := range p.Access.Groups {
+			m := g.Mode
+			if m == "" {
+				m = "read"
+			}
+			want[g.Name] = m
+		}
+		got := map[string]string{}
+		if proj.Access != nil {
+			for _, g := range proj.Access.Groups {
+				m := g.Mode
+				if m == "" {
+					m = "read"
+				}
+				got[g.Name] = m
+			}
+		}
+		if len(want) != len(got) {
+			return false
+		}
+		for k, v := range want {
+			if got[k] != v {
+				return false
+			}
+		}
+	}
 	return true
 }
 
@@ -181,6 +220,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		Description: p.Description,
 		Defaults:    toClientDefaults(p.Defaults),
 		Attached:    toClientAttached(p.Attached),
+		Access:      toClientAccess(p.Access),
 	}, p.Owner)
 	if err != nil {
 		// If the project already exists by name, adopt it instead of creating duplicates.
@@ -216,6 +256,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		Description: p.Description,
 		Defaults:    toClientDefaults(p.Defaults),
 		Attached:    toClientAttached(p.Attached),
+		Access:      toClientAccess(p.Access),
 	}, p.Owner)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateProject)
