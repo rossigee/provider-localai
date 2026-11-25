@@ -6,11 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -72,7 +74,36 @@ var allowedKeys = map[string]bool{
 	"f16":                               true,
 	"artifact_download_concurrency":     true,
 	"max_concurrent_backend_operations": true,
+	"max_concurrent_model_operations":   true,
 	"debug":                             true,
+}
+
+// typedKeys are scalar settings that only accept JSON literals of a specific
+// shape. Everything in allowedKeys without a value validator keeps whatever
+// JSON type the user wrote (LocalAI is tolerant of e.g. numeric strings there,
+// and matching its behaviour exactly is not worth the churn); the keys below
+// carry values whose type matters for correctness, so they are checked here.
+var boolKeys = map[string]bool{
+	"size_aware_eviction":             true,
+	"memory_reclaimer_enabled":        true,
+	"distributed_disk_headroom_check": true,
+	"home_page_area_enabled":          true,
+	"shared_pages_enabled":            true,
+	"user_page_shares_enabled":        true,
+}
+
+var unitFloatKeys = map[string]bool{ // 0.0-1.0 fraction
+	"memory_reclaimer_threshold": true,
+}
+
+var nonNegativeIntKeys = map[string]bool{
+	"tracing_max_items":      true,
+	"tracing_max_body_bytes": true,
+}
+
+var durationKeys = map[string]bool{
+	"watchdog_interval":        true,
+	"open_responses_store_ttl": true, // e.g. "1h", "30m", "0" = no expiration
 }
 
 // chatsValues are the chats_* keys a Settings resource may set, each with the
@@ -84,6 +115,58 @@ var allowedKeys = map[string]bool{
 var chatsValues = map[string][]any{
 	"chats_tool_search":   {"auto", "on", "off"},
 	"chats_localai_admin": {false},
+}
+
+// brandingKeys are the LocalAI instance branding settings: the name and
+// tagline shown on the login page, and the uploaded logo/favicon files
+// served at /branding/asset/<kind>. They carry no credentials and cannot
+// reach remote hosts: the filename keys are validated to a safe basename
+// (no path separators, traversal or control characters) so a Settings
+// resource cannot point LocalAI at a file outside the branding directory.
+const (
+	brandingFilenameMaxLen = 128
+	brandingTextMaxLen     = 256
+)
+
+var brandingKeys = map[string]string{
+	"instance_name":        "text",
+	"instance_tagline":     "text",
+	"logo_file":            "filename",
+	"logo_horizontal_file": "filename",
+	"favicon_file":         "filename",
+}
+
+// validateBrandingValue checks a branding value. A "filename" must be a
+// plain basename: no path separators, no "." or "..", no control characters,
+// at most 128 characters. An empty string is accepted as a reset to the
+// LocalAI default branding. A "text" value is free text, at most 256
+// characters, with no control characters.
+func validateBrandingValue(key, kind string, v any) error {
+	s, ok := v.(string)
+	if !ok {
+		return errors.New("value must be a string")
+	}
+	if kind == "filename" {
+		if len(s) > brandingFilenameMaxLen {
+			return fmt.Errorf("filename must be at most %d characters", brandingFilenameMaxLen)
+		}
+		if s != "" {
+			if strings.ContainsAny(s, "/\\") {
+				return errors.New("filename must not contain path separators")
+			}
+			if s == "." || s == ".." {
+				return errors.New("filename must not be . or ..")
+			}
+		}
+	} else if len(s) > brandingTextMaxLen {
+		return fmt.Errorf("value must be at most %d characters", brandingTextMaxLen)
+	}
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			return errors.New("value contains control characters")
+		}
+	}
+	return nil
 }
 
 // Setup registers the Settings controller.
@@ -140,6 +223,51 @@ func parseSettings(raw string) (map[string]any, error) {
 			return nil, errors.New(msg)
 		}
 		if allowedKeys[k] {
+			continue
+		}
+		if kind, ok := brandingKeys[k]; ok {
+			if err := validateBrandingValue(k, kind, v); err != nil {
+				return nil, errors.Wrapf(err, "settings key %q", k)
+			}
+			continue
+		}
+		if boolKeys[k] {
+			if _, ok := v.(bool); !ok {
+				return nil, errors.Errorf("settings key %q must be a boolean", k)
+			}
+			continue
+		}
+		if unitFloatKeys[k] {
+			f, ok := v.(float64)
+			if !ok {
+				return nil, errors.Errorf("settings key %q must be a number between 0 and 1", k)
+			}
+			if f < 0 || f > 1 {
+				return nil, errors.Errorf("settings key %q must be between 0 and 1", k)
+			}
+			continue
+		}
+		if nonNegativeIntKeys[k] {
+			f, ok := v.(float64)
+			if !ok {
+				return nil, errors.Errorf("settings key %q must be an integer", k)
+			}
+			if f < 0 || f != float64(int64(f)) {
+				return nil, errors.Errorf("settings key %q must be a non-negative integer", k)
+			}
+			continue
+		}
+		if durationKeys[k] {
+			s, ok := v.(string)
+			if !ok {
+				return nil, errors.Errorf("settings key %q must be a duration string (e.g. \"5m\", \"0\")", k)
+			}
+			if s == "" {
+				return nil, errors.Errorf("settings key %q must not be empty", k)
+			}
+			if d, err := time.ParseDuration(s); err != nil || d < 0 {
+				return nil, errors.Errorf("settings key %q must be a non-negative duration (e.g. \"5m\", \"0\")", k)
+			}
 			continue
 		}
 		if allowed, ok := chatsValues[k]; ok {
