@@ -318,6 +318,9 @@ make lint
 make generate
 ```
 
+API coverage — which LocalAI resources and `/api/settings` keys are supported,
+blocked, or excluded — is documented in [`docs/coverage.md`](docs/coverage.md).
+
 The LocalAI API client lives in
 [`github.com/rossigee/localai-client`](https://github.com/rossigee/localai-client).
 
