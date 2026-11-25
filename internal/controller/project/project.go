@@ -102,6 +102,17 @@ func toClientAttached(a *projectv1beta1.ProjectAttached) *laiclient.ProjectAttac
 	}
 }
 
+func toClientAccess(a *projectv1beta1.ProjectAccess) *laiclient.ProjectAccess {
+	if a == nil {
+		return nil
+	}
+	out := &laiclient.ProjectAccess{Groups: make([]laiclient.ProjectAccessGrant, 0, len(a.Groups))}
+	for _, g := range a.Groups {
+		out.Groups = append(out.Groups, laiclient.ProjectAccessGrant{Name: g.Name, Mode: g.Mode})
+	}
+	return out
+}
+
 func fromClientProject(p *laiclient.Project) *projectv1beta1.ProjectObservation {
 	if p == nil {
 		return nil
@@ -109,6 +120,7 @@ func fromClientProject(p *laiclient.Project) *projectv1beta1.ProjectObservation 
 	return &projectv1beta1.ProjectObservation{
 		ID:        p.ID,
 		Name:      p.Name,
+		Owner:     p.Owner,
 		Status:    p.Status,
 		ChatCount: p.ChatCount,
 	}
@@ -123,7 +135,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	var proj *laiclient.Project
 	var err error
 	if id != "" {
-		proj, err = e.client.GetProject(ctx, id)
+		proj, err = e.client.GetProject(ctx, id, p.Owner)
 		if err != nil {
 			if laiclient.IsNotFound(err) {
 				return managed.ExternalObservation{ResourceExists: false}, nil
@@ -131,7 +143,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
 		}
 	} else {
-		proj, err = e.findProjectByName(ctx, p.Name)
+		proj, err = e.findProjectByName(ctx, p.Name, p.Owner)
 		if err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
 		}
@@ -148,8 +160,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (e *external) findProjectByName(ctx context.Context, name string) (*laiclient.Project, error) {
-	projects, err := e.client.ListProjects(ctx)
+func (e *external) findProjectByName(ctx context.Context, name, owner string) (*laiclient.Project, error) {
+	projects, err := e.client.ListProjects(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +180,34 @@ func projectUpToDate(p projectv1beta1.ProjectParameters, proj *laiclient.Project
 	if p.Description != "" && p.Description != proj.Description {
 		return false
 	}
+	if p.Access != nil {
+		want := map[string]string{}
+		for _, g := range p.Access.Groups {
+			m := g.Mode
+			if m == "" {
+				m = "read"
+			}
+			want[g.Name] = m
+		}
+		got := map[string]string{}
+		if proj.Access != nil {
+			for _, g := range proj.Access.Groups {
+				m := g.Mode
+				if m == "" {
+					m = "read"
+				}
+				got[g.Name] = m
+			}
+		}
+		if len(want) != len(got) {
+			return false
+		}
+		for k, v := range want {
+			if got[k] != v {
+				return false
+			}
+		}
+	}
 	return true
 }
 
@@ -180,10 +220,11 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		Description: p.Description,
 		Defaults:    toClientDefaults(p.Defaults),
 		Attached:    toClientAttached(p.Attached),
-	})
+		Access:      toClientAccess(p.Access),
+	}, p.Owner)
 	if err != nil {
 		// If the project already exists by name, adopt it instead of creating duplicates.
-		existing, lerr := e.findProjectByName(ctx, p.Name)
+		existing, lerr := e.findProjectByName(ctx, p.Name, p.Owner)
 		if lerr == nil && existing != nil {
 			meta.SetExternalName(cr, existing.ID)
 			cr.Status.AtProvider = *fromClientProject(existing)
@@ -195,7 +236,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr.Status.AtProvider = *fromClientProject(proj)
 	// Handle archive if requested
 	if p.Archived != nil && *p.Archived {
-		if err := e.client.ArchiveProject(ctx, proj.ID); err != nil {
+		if err := e.client.ArchiveProject(ctx, proj.ID, p.Owner); err != nil {
 			return managed.ExternalCreation{}, errors.Wrap(err, errUpdateProject)
 		}
 	}
@@ -215,18 +256,19 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		Description: p.Description,
 		Defaults:    toClientDefaults(p.Defaults),
 		Attached:    toClientAttached(p.Attached),
-	})
+		Access:      toClientAccess(p.Access),
+	}, p.Owner)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateProject)
 	}
 	// Handle archive state
 	if p.Archived != nil {
 		if *p.Archived {
-			if err := e.client.ArchiveProject(ctx, id); err != nil {
+			if err := e.client.ArchiveProject(ctx, id, p.Owner); err != nil {
 				return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateProject)
 			}
 		} else {
-			if err := e.client.RestoreProject(ctx, id); err != nil {
+			if err := e.client.RestoreProject(ctx, id, p.Owner); err != nil {
 				return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateProject)
 			}
 		}
@@ -241,7 +283,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if id == "" {
 		id = cr.Spec.ForProvider.Name
 	}
-	if err := e.client.DeleteProject(ctx, id); err != nil && !laiclient.IsNotFound(err) {
+	if err := e.client.DeleteProject(ctx, id, cr.Spec.ForProvider.Owner); err != nil && !laiclient.IsNotFound(err) {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteProject)
 	}
 	return managed.ExternalDelete{}, nil

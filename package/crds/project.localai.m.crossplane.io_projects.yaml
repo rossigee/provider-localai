@@ -57,6 +57,30 @@ spec:
                 description: ProjectParameters are the desired settings of a LocalAI
                   project.
                 properties:
+                  access:
+                    description: Access declares OIDC group access grants for the
+                      project.
+                    properties:
+                      groups:
+                        description: Groups are OIDC group access grants.
+                        items:
+                          description: ProjectAccessGrant gives an OIDC group access
+                            to a project.
+                          properties:
+                            mode:
+                              description: Mode is read or write. Defaults to read.
+                              enum:
+                              - read
+                              - write
+                              type: string
+                            name:
+                              description: Name is the OIDC group name.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                    type: object
                   archived:
                     description: Archived, when set to true, archives the project.
                     type: boolean
@@ -116,6 +140,12 @@ spec:
                     type: string
                   name:
                     description: Name is the project's name in LocalAI.
+                    type: string
+                  owner:
+                    description: |-
+                      Owner is the LocalAI user id to act on behalf of. When set, the provider
+                      passes user_id to LocalAI project endpoints (admin scope). Leave empty to
+                      manage projects owned by the API key identity.
                     type: string
                 required:
                 - name
@@ -193,6 +223,9 @@ spec:
                     type: string
                   name:
                     description: Name is the project's name as LocalAI reports it.
+                    type: string
+                  owner:
+                    description: Owner is the LocalAI user id that owns the project.
                     type: string
                   status:
                     description: Status is the project status (active, archived, broken).

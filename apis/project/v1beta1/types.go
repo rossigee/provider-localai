@@ -34,6 +34,24 @@ type ProjectAttached struct {
 	Collections []string `json:"collections,omitempty"`
 }
 
+// ProjectAccessGrant gives an OIDC group access to a project.
+type ProjectAccessGrant struct {
+	// Name is the OIDC group name.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// Mode is read or write. Defaults to read.
+	// +optional
+	// +kubebuilder:validation:Enum=read;write
+	Mode string `json:"mode,omitempty"`
+}
+
+// ProjectAccess declares access grants for the project.
+type ProjectAccess struct {
+	// Groups are OIDC group access grants.
+	// +optional
+	Groups []ProjectAccessGrant `json:"groups,omitempty"`
+}
+
 // ProjectParameters are the desired settings of a LocalAI project.
 type ProjectParameters struct {
 	// Name is the project's name in LocalAI.
@@ -44,6 +62,12 @@ type ProjectParameters struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 
+	// Owner is the LocalAI user id to act on behalf of. When set, the provider
+	// passes user_id to LocalAI project endpoints (admin scope). Leave empty to
+	// manage projects owned by the API key identity.
+	// +optional
+	Owner string `json:"owner,omitempty"`
+
 	// Defaults are the tool defaults applied to new chats in the project.
 	// +optional
 	Defaults *ProjectDefaults `json:"defaults,omitempty"`
@@ -51,6 +75,10 @@ type ProjectParameters struct {
 	// Attached are the always-on (attached) tools for the project.
 	// +optional
 	Attached *ProjectAttached `json:"attached,omitempty"`
+
+	// Access declares OIDC group access grants for the project.
+	// +optional
+	Access *ProjectAccess `json:"access,omitempty"`
 
 	// Archived, when set to true, archives the project.
 	// +optional
@@ -63,6 +91,8 @@ type ProjectObservation struct {
 	ID string `json:"id,omitempty"`
 	// Name is the project's name as LocalAI reports it.
 	Name string `json:"name,omitempty"`
+	// Owner is the LocalAI user id that owns the project.
+	Owner string `json:"owner,omitempty"`
 	// Status is the project status (active, archived, broken).
 	Status string `json:"status,omitempty"`
 	// ChatCount is the number of chats in the project.
