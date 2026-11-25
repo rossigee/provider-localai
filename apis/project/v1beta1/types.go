@@ -44,6 +44,12 @@ type ProjectParameters struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 
+	// Owner is the LocalAI user id to act on behalf of. When set, the provider
+	// passes user_id to LocalAI project endpoints (admin scope). Leave empty to
+	// manage projects owned by the API key identity.
+	// +optional
+	Owner string `json:"owner,omitempty"`
+
 	// Defaults are the tool defaults applied to new chats in the project.
 	// +optional
 	Defaults *ProjectDefaults `json:"defaults,omitempty"`
@@ -63,6 +69,8 @@ type ProjectObservation struct {
 	ID string `json:"id,omitempty"`
 	// Name is the project's name as LocalAI reports it.
 	Name string `json:"name,omitempty"`
+	// Owner is the LocalAI user id that owns the project.
+	Owner string `json:"owner,omitempty"`
 	// Status is the project status (active, archived, broken).
 	Status string `json:"status,omitempty"`
 	// ChatCount is the number of chats in the project.
