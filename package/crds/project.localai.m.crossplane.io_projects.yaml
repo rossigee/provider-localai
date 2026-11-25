@@ -117,6 +117,12 @@ spec:
                   name:
                     description: Name is the project's name in LocalAI.
                     type: string
+                  owner:
+                    description: Owner is the LocalAI user id to act on behalf of.
+                      When set, the provider passes user_id to LocalAI project endpoints
+                      (admin scope). Leave empty to manage projects owned by the API
+                      key identity.
+                    type: string
                 required:
                 - name
                 type: object
@@ -193,6 +199,9 @@ spec:
                     type: string
                   name:
                     description: Name is the project's name as LocalAI reports it.
+                    type: string
+                  owner:
+                    description: Owner is the LocalAI user id that owns the project.
                     type: string
                   status:
                     description: Status is the project status (active, archived, broken).
