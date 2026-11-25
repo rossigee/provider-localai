@@ -85,6 +85,30 @@ spec:
                           type: string
                         type: array
                     type: object
+                  access:
+                    description: Access declares OIDC group access grants for the
+                      project.
+                    properties:
+                      groups:
+                        description: Groups are OIDC group access grants.
+                        items:
+                          description: ProjectAccessGrant gives an OIDC group access
+                            to a project.
+                          properties:
+                            mode:
+                              description: Mode is read or write. Defaults to read.
+                              enum:
+                              - read
+                              - write
+                              type: string
+                            name:
+                              description: Name is the OIDC group name.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                    type: object
                   defaults:
                     description: Defaults are the tool defaults applied to new chats
                       in the project.
