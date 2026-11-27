@@ -8,7 +8,7 @@ resource accepts, blocks, or excludes.
 
 | LocalAI API | CRD | Controller | Endpoints covered | Notes |
 |-------------|-----|------------|-------------------|-------|
-| `/api/chats/agents` | `agents.localai.m.crossplane.io` | `internal/controller/agent` | list, get, create, update, delete | Skills/collections/MCP servers referenced by name |
+| `/api/chats/agents` | `agents.localai.m.crossplane.io` | `internal/controller/agent` | list, get, create, update, delete | Skills/collections/MCP servers referenced by name; `spec.forProvider.owner` sends `user_id` for admin impersonation |
 | `/api/chats/skills` | `skills.localai.m.crossplane.io` | `internal/controller/skill` | list, get, create, update, delete | Layered skill writes |
 | `/api/collections` + `/sources` | `collections.localai.m.crossplane.io` | `internal/controller/collection` | list collections, create, add/remove sources | |
 | `/api/chats/projects` (+ archive/restore) | `projects.localai.m.crossplane.io` | `internal/controller/project` | list, get, create, update, delete, archive, restore | `Archived *bool` |
@@ -20,7 +20,7 @@ resource accepts, blocks, or excludes.
 | `/api/settings` | `settings.localai.m.crossplane.io` | `internal/controller/settings` | GET + POST (allow-listed keys only) | See settings coverage below |
 | Provider endpoint/key/CA | `providerconfigs.localai.m.crossplane.io` | `internal/controller/providerconfig` | — | Connection credentials |
 
-Every resource method exposed by [`github.com/rossigee/localai-client`](https://github.com/rossigee/localai-client) v0.9.1 has a matching CRD and controller with full Create/Observe/Update/Delete.
+Every resource method exposed by the pinned [`github.com/rossigee/localai-client`](https://github.com/rossigee/localai-client) version has a matching CRD and controller with full Create/Observe/Update/Delete. `Agent` and `Project` resources can set `spec.forProvider.owner` to send `user_id` to LocalAI when an administrator manages another user's objects.
 
 ## Settings coverage — `POST /api/settings` allow-list
 

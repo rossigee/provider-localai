@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Settings` values are now type-checked for the typed keys above, so a
   mistyped value is rejected with a clear error instead of being silently
   ignored by LocalAI.
+- `Agent` managed resources accept `spec.forProvider.owner` and report
+  `status.atProvider.owner`. When set, the provider sends `user_id` to LocalAI
+  so an administrator can manage another user's agents.
 
 ## [0.13.1] - 2026-11-22
 

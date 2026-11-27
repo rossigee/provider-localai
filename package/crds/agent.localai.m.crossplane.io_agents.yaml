@@ -112,6 +112,12 @@ spec:
                     description: Network is LocalAI's network preset for the agent.
                       Empty means off.
                     type: string
+                  owner:
+                    description: |-
+                      Owner is the LocalAI user id to act on behalf of. When set, the provider
+                      passes user_id to LocalAI agent endpoints (admin scope). Leave empty to
+                      manage agents owned by the API key identity.
+                    type: string
                   skills:
                     description: Skills lists the names of the skills the agent may
                       use.
@@ -190,6 +196,9 @@ spec:
                     description: |-
                       ID is the LocalAI identifier of the agent. It is also the agent's
                       external name.
+                    type: string
+                  owner:
+                    description: Owner is the LocalAI user id that owns the agent.
                     type: string
                 type: object
               conditions:
