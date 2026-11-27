@@ -17,5 +17,7 @@ spec:
     mcpServers:
       - odoo
     network: off
+    # Set to a LocalAI user ID to manage this agent on that user's behalf.
+    # owner: tenant-user
   providerConfigRef:
     name: localai
