@@ -59,6 +59,12 @@ type AgentParameters struct {
 	// Folder chooses the folder the agent works in.
 	// +optional
 	Folder *AgentFolder `json:"folder,omitempty"`
+
+	// Owner is the LocalAI user id to act on behalf of. When set, the provider
+	// passes user_id to LocalAI agent endpoints (admin scope). Leave empty to
+	// manage agents owned by the API key identity.
+	// +optional
+	Owner string `json:"owner,omitempty"`
 }
 
 // AgentObservation is the state LocalAI reports for the agent.
@@ -66,6 +72,8 @@ type AgentObservation struct {
 	// ID is the LocalAI identifier of the agent. It is also the agent's
 	// external name.
 	ID string `json:"id,omitempty"`
+	// Owner is the LocalAI user id that owns the agent.
+	Owner string `json:"owner,omitempty"`
 }
 
 // AgentSpec is the desired state of an Agent.

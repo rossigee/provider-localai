@@ -89,7 +89,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if id == "" {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
-	a, err := e.client.GetAgent(ctx, id)
+	a, err := e.client.GetAgent(ctx, id, cr.Spec.ForProvider.Owner)
 	if err != nil {
 		if laiclient.IsNotFound(err) {
 			return managed.ExternalObservation{ResourceExists: false}, nil
@@ -97,6 +97,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetAgent)
 	}
 	cr.Status.AtProvider.ID = a.ID
+	cr.Status.AtProvider.Owner = a.Owner
 	cr.Status.SetConditions(xpv1.Available())
 	return managed.ExternalObservation{
 		ResourceExists:   true,
@@ -109,6 +110,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func agentUpToDate(cr *agentv1beta1.Agent, a *laiclient.Agent) bool {
 	p := cr.Spec.ForProvider
 	if a.Name != p.Name || a.Description != p.Description || a.Instructions != p.Instructions || a.Model != p.Model {
+		return false
+	}
+	if p.Owner != "" && a.Owner != p.Owner {
 		return false
 	}
 	if networkOf(a.Network) != networkOf(p.Network) {
@@ -183,12 +187,12 @@ func agentWrite(cr *agentv1beta1.Agent) laiclient.AgentWrite {
 // is recorded, and the next reconcile updates it to the spec.
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr := mg.(*agentv1beta1.Agent)
-	a, err := e.client.CreateAgent(ctx, agentWrite(cr))
+	a, err := e.client.CreateAgent(ctx, agentWrite(cr), cr.Spec.ForProvider.Owner)
 	if err != nil {
 		if !isNameConflict(err) {
 			return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
 		}
-		existing, lerr := e.findAgentByName(ctx, cr.Spec.ForProvider.Name)
+		existing, lerr := e.findAgentByName(ctx, cr.Spec.ForProvider.Name, cr.Spec.ForProvider.Owner)
 		if lerr != nil {
 			return managed.ExternalCreation{}, errors.Wrap(lerr, errCreateAgent)
 		}
@@ -201,6 +205,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	meta.SetExternalName(cr, a.ID)
 	cr.Status.AtProvider.ID = a.ID
+	cr.Status.AtProvider.Owner = a.Owner
 	return managed.ExternalCreation{}, nil
 }
 
@@ -212,8 +217,8 @@ func isNameConflict(err error) bool {
 }
 
 // findAgentByName returns the saved agent with the given name, or nil.
-func (e *external) findAgentByName(ctx context.Context, name string) (*laiclient.Agent, error) {
-	agents, err := e.client.ListAgents(ctx)
+func (e *external) findAgentByName(ctx context.Context, name, owner string) (*laiclient.Agent, error) {
+	agents, err := e.client.ListAgents(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +234,7 @@ func (e *external) findAgentByName(ctx context.Context, name string) (*laiclient
 // so the full desired state is sent.
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*agentv1beta1.Agent)
-	if _, err := e.client.UpdateAgent(ctx, meta.GetExternalName(cr), agentWrite(cr)); err != nil {
+	if _, err := e.client.UpdateAgent(ctx, meta.GetExternalName(cr), agentWrite(cr), cr.Spec.ForProvider.Owner); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
 	}
 	return managed.ExternalUpdate{}, nil
@@ -243,7 +248,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if id == "" {
 		return managed.ExternalDelete{}, nil
 	}
-	if err := e.client.DeleteAgent(ctx, id); err != nil && !laiclient.IsNotFound(err) {
+	if err := e.client.DeleteAgent(ctx, id, cr.Spec.ForProvider.Owner); err != nil && !laiclient.IsNotFound(err) {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteAgent)
 	}
 	return managed.ExternalDelete{}, nil
