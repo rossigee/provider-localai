@@ -65,6 +65,12 @@ type AgentParameters struct {
 	// manage agents owned by the API key identity.
 	// +optional
 	Owner string `json:"owner,omitempty"`
+
+	// ProjectID is the LocalAI project the agent belongs to. A normal agent
+	// write cannot change a project, so the provider uses the dedicated move
+	// endpoint. Leave empty for a projectless agent.
+	// +optional
+	ProjectID string `json:"projectId,omitempty"`
 }
 
 // AgentObservation is the state LocalAI reports for the agent.
@@ -74,6 +80,8 @@ type AgentObservation struct {
 	ID string `json:"id,omitempty"`
 	// Owner is the LocalAI user id that owns the agent.
 	Owner string `json:"owner,omitempty"`
+	// ProjectID is the project the agent currently belongs to.
+	ProjectID string `json:"projectId,omitempty"`
 }
 
 // AgentSpec is the desired state of an Agent.

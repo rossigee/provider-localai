@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"net/http"
+	"net/url"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -72,11 +73,23 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build LocalAI client")
 	}
-	return &external{client: laic}, nil
+	raw, err := clients.NewRawClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &external{client: laic, raw: raw}, nil
 }
 
 type external struct {
 	client *laiclient.Client
+	raw    *clients.RawClient
+}
+
+// agentState is the client library's agent plus project_id, which the library
+// does not expose and the provider needs for project membership.
+type agentState struct {
+	laiclient.Agent
+	ProjectID string `json:"project_id,omitempty"`
 }
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
@@ -89,8 +102,12 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if id == "" {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
-	a, err := e.client.GetAgent(ctx, id, cr.Spec.ForProvider.Owner)
-	if err != nil {
+	path := "/api/chats/agents/" + url.PathEscape(id)
+	if cr.Spec.ForProvider.Owner != "" {
+		path += "?user_id=" + url.QueryEscape(cr.Spec.ForProvider.Owner)
+	}
+	var a agentState
+	if err := e.raw.Do(ctx, http.MethodGet, path, nil, &a); err != nil {
 		if laiclient.IsNotFound(err) {
 			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
@@ -98,10 +115,11 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	cr.Status.AtProvider.ID = a.ID
 	cr.Status.AtProvider.Owner = a.Owner
+	cr.Status.AtProvider.ProjectID = a.ProjectID
 	cr.Status.SetConditions(xpv1.Available())
 	return managed.ExternalObservation{
 		ResourceExists:   true,
-		ResourceUpToDate: agentUpToDate(cr, a),
+		ResourceUpToDate: agentUpToDate(cr, &a.Agent) && a.ProjectID == cr.Spec.ForProvider.ProjectID,
 	}, nil
 }
 
@@ -202,11 +220,23 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		meta.SetExternalName(cr, existing.ID)
 		cr.Status.AtProvider.ID = existing.ID
 		cr.Status.AtProvider.Owner = existing.Owner
+		if p := cr.Spec.ForProvider.ProjectID; p != "" {
+			if err := e.moveAgentProject(ctx, cr, p); err != nil {
+				return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
+			}
+			cr.Status.AtProvider.ProjectID = p
+		}
 		return managed.ExternalCreation{}, nil
 	}
 	meta.SetExternalName(cr, a.ID)
 	cr.Status.AtProvider.ID = a.ID
 	cr.Status.AtProvider.Owner = a.Owner
+	if p := cr.Spec.ForProvider.ProjectID; p != "" {
+		if err := e.moveAgentProject(ctx, cr, p); err != nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, errCreateAgent)
+		}
+		cr.Status.AtProvider.ProjectID = p
+	}
 	return managed.ExternalCreation{}, nil
 }
 
@@ -231,12 +261,30 @@ func (e *external) findAgentByName(ctx context.Context, name, owner string) (*la
 	return nil, nil
 }
 
+// moveAgentProject uses LocalAI's dedicated move endpoint. A normal agent PUT
+// refuses a changed project, so membership can only be changed here.
+func (e *external) moveAgentProject(ctx context.Context, cr *agentv1beta1.Agent, projectID string) error {
+	id := meta.GetExternalName(cr)
+	path := "/api/chats/agents/" + url.PathEscape(id) + "/project"
+	if cr.Spec.ForProvider.Owner != "" {
+		path += "?user_id=" + url.QueryEscape(cr.Spec.ForProvider.Owner)
+	}
+	return e.raw.Do(ctx, http.MethodPut, path, map[string]string{"project_id": projectID}, nil)
+}
+
 // Update replaces the saved agent. LocalAI's update replaces the whole agent,
-// so the full desired state is sent.
+// so the full desired state is sent. Project membership is moved separately
+// because a normal agent write cannot change it.
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr := mg.(*agentv1beta1.Agent)
 	if _, err := e.client.UpdateAgent(ctx, meta.GetExternalName(cr), agentWrite(cr), cr.Spec.ForProvider.Owner); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
+	}
+	if p := cr.Spec.ForProvider.ProjectID; p != "" && p != cr.Status.AtProvider.ProjectID {
+		if err := e.moveAgentProject(ctx, cr, p); err != nil {
+			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateAgent)
+		}
+		cr.Status.AtProvider.ProjectID = p
 	}
 	return managed.ExternalUpdate{}, nil
 }
