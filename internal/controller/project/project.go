@@ -137,10 +137,25 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if id != "" {
 		proj, err = e.client.GetProject(ctx, id, p.Owner)
 		if err != nil {
-			if laiclient.IsNotFound(err) {
+			if !laiclient.IsNotFound(err) {
+				return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
+			}
+			// Crossplane's default NameAsExternalName initializer writes the
+			// managed resource's name to the external-name annotation when it
+			// is empty. For Project that name is a display name/slug, but
+			// LocalAI's GET /api/chats/projects/<id> resolves UUIDs only and
+			// returns 404 for a slug. Without a name fallback Observe would
+			// report "does not exist" and Create would make a duplicate on
+			// every reconcile. Try to adopt by name before concluding the
+			// project is gone.
+			proj, err = e.findProjectByName(ctx, p.Name, p.Owner)
+			if err != nil {
+				return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
+			}
+			if proj == nil {
 				return managed.ExternalObservation{ResourceExists: false}, nil
 			}
-			return managed.ExternalObservation{}, errors.Wrap(err, errGetProject)
+			meta.SetExternalName(cr, proj.ID)
 		}
 	} else {
 		proj, err = e.findProjectByName(ctx, p.Name, p.Owner)
