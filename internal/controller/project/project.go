@@ -21,11 +21,11 @@ import (
 )
 
 const (
-	errNotProject     = "managed resource is not a Project"
-	errGetProject     = "cannot get LocalAI project"
-	errCreateProject  = "cannot create LocalAI project"
-	errUpdateProject  = "cannot update LocalAI project"
-	errDeleteProject  = "cannot delete LocalAI project"
+	errNotProject    = "managed resource is not a Project"
+	errGetProject    = "cannot get LocalAI project"
+	errCreateProject = "cannot create LocalAI project"
+	errUpdateProject = "cannot update LocalAI project"
+	errDeleteProject = "cannot delete LocalAI project"
 
 	controllerName = "projects.project.localai.m.crossplane.io"
 )
@@ -195,6 +195,10 @@ func projectUpToDate(p projectv1beta1.ProjectParameters, proj *laiclient.Project
 	if p.Description != "" && p.Description != proj.Description {
 		return false
 	}
+	if !projectToolsUpToDate(p.Defaults, proj.Defaults) ||
+		!projectAttachedUpToDate(p.Attached, proj.Attached) {
+		return false
+	}
 	if p.Access != nil {
 		want := map[string]string{}
 		for _, g := range p.Access.Groups {
@@ -221,6 +225,60 @@ func projectUpToDate(p projectv1beta1.ProjectParameters, proj *laiclient.Project
 			if got[k] != v {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+// projectToolsUpToDate compares the new-chat tool defaults. Without this,
+// Update sends defaults on other drift but a manifest-only change to the
+// defaults is never detected, so projects keep starting chats with every
+// skill and connector the user can see. Lists are compared as sets: LocalAI
+// may reorder them and order has no meaning here.
+func projectToolsUpToDate(want *projectv1beta1.ProjectDefaults, got *laiclient.ProjectDefaults) bool {
+	if want == nil {
+		return true // no override requested; do not fight the instance
+	}
+	if got == nil {
+		return len(want.Skills)+len(want.Addons)+len(want.Connectors)+
+			len(want.MCPServers)+len(want.Collections) == 0
+	}
+	return toolListsEqual(want.Skills, got.Skills) &&
+		toolListsEqual(want.Addons, got.Addons) &&
+		toolListsEqual(want.Connectors, got.Connectors) &&
+		toolListsEqual(want.MCPServers, got.MCPServers) &&
+		toolListsEqual(want.Collections, got.Collections)
+}
+
+// projectAttachedUpToDate compares the always-on tool lists for the same
+// reason as projectToolsUpToDate.
+func projectAttachedUpToDate(want *projectv1beta1.ProjectAttached, got *laiclient.ProjectAttached) bool {
+	if want == nil {
+		return true
+	}
+	if got == nil {
+		return len(want.Skills)+len(want.Addons)+len(want.Connectors)+
+			len(want.MCPServers)+len(want.Collections) == 0
+	}
+	return toolListsEqual(want.Skills, got.Skills) &&
+		toolListsEqual(want.Addons, got.Addons) &&
+		toolListsEqual(want.Connectors, got.Connectors) &&
+		toolListsEqual(want.MCPServers, got.MCPServers) &&
+		toolListsEqual(want.Collections, got.Collections)
+}
+
+// toolListsEqual compares two tool-name lists ignoring order.
+func toolListsEqual(want, got []string) bool {
+	if len(want) != len(got) {
+		return false
+	}
+	set := make(map[string]struct{}, len(got))
+	for _, v := range got {
+		set[v] = struct{}{}
+	}
+	for _, v := range want {
+		if _, ok := set[v]; !ok {
+			return false
 		}
 	}
 	return true
