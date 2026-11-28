@@ -8,7 +8,7 @@ require (
 	github.com/crossplane/crossplane/apis/v2 v2.5.0-rc.0.0.20261029180807-76a72bee8a19
 	github.com/go-logr/logr v1.4.4
 	github.com/pkg/errors v0.9.1
-	github.com/rossigee/localai-client v0.10.1-0.20261127120235-01ba79822f57
+	github.com/rossigee/localai-client v0.10.1
 	golang.org/x/oauth2 v0.38.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	k8s.io/api v0.37.2
