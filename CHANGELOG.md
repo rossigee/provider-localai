@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `Project` managed resource: when a slug-valued external-name yields a 404 from LocalAI's UUID-only lookup, `Observe` now falls back to a name lookup and adopts the existing project's real UUID, instead of treating the project as absent and creating a duplicate on every reconcile.
+
 ### Added
 
 - `Settings` managed resource: instance, runtime and page settings that were
