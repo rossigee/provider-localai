@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `crossplane-runtime/v2` is pinned to the `rossigee` fork's `v2.5.0-dev-5` series, matching the platform standard.
+
 ### Fixed
 
 - `Project` managed resource: when a slug-valued external-name yields a 404 from LocalAI's UUID-only lookup, `Observe` now falls back to a name lookup and adopts the existing project's real UUID, instead of treating the project as absent and creating a duplicate on every reconcile.
+- `Project` managed resource: `Observe` now compares new-chat tool defaults and always-on attached lists (order-insensitively), so GitOps-only edits to those lists reconcile instead of being silently ignored.
 
 ### Added
 
