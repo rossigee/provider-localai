@@ -91,6 +91,75 @@ func TestObserveAdoptsByName(t *testing.T) {
 	}
 }
 
+func TestObserveProjectDetectsDefaultsDrift(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/chats/projects/p1" {
+			_, _ = io.WriteString(w, `{"id":"p1","name":"My Project","status":"active",`+
+				`"defaults":{"skills":["old-skill"]}}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	cr := projectCR("My Project")
+	cr.Spec.ForProvider.Defaults = &projectv1beta1.ProjectDefaults{
+		Skills: []string{"new-skill"},
+	}
+	meta.SetExternalName(cr, "p1")
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if obs.ResourceUpToDate {
+		t.Error("ResourceUpToDate = true, want false when defaults drifted")
+	}
+}
+
+func TestObserveProjectDetectsAttachedDrift(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/chats/projects/p1" {
+			_, _ = io.WriteString(w, `{"id":"p1","name":"My Project","status":"active",`+
+				`"attached":{"skills":["old-skill"]}}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	cr := projectCR("My Project")
+	cr.Spec.ForProvider.Attached = &projectv1beta1.ProjectAttached{
+		Skills: []string{"new-skill"},
+	}
+	meta.SetExternalName(cr, "p1")
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if obs.ResourceUpToDate {
+		t.Error("ResourceUpToDate = true, want false when attached drifted")
+	}
+}
+
+func TestObserveProjectIgnoresDefaultOrder(t *testing.T) {
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/chats/projects/p1" {
+			_, _ = io.WriteString(w, `{"id":"p1","name":"My Project","status":"active",`+
+				`"defaults":{"skills":["b","a"]}}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	cr := projectCR("My Project")
+	cr.Spec.ForProvider.Defaults = &projectv1beta1.ProjectDefaults{
+		Skills: []string{"a", "b"},
+	}
+	meta.SetExternalName(cr, "p1")
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceUpToDate {
+		t.Error("ResourceUpToDate = false, want true when only order differs")
+	}
+}
+
 func TestCreateProject(t *testing.T) {
 	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/api/chats/projects" {
