@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,6 +68,37 @@ func TestObserveExistingProjectExists(t *testing.T) {
 	}
 	if !obs.ResourceExists {
 		t.Errorf("ResourceExists = false, want true")
+	}
+}
+
+func TestObserveAdoptsByNameAfterSlugExternalName404(t *testing.T) {
+	// Crossplane's NameAsExternalName initializer sets external-name to the
+	// resource name (a slug) when the annotation is empty. LocalAI resolves
+	// GET /api/chats/projects/<id> by UUID only and 404s for a slug. Observe
+	// must fall back to a name lookup and adopt the real UUID, otherwise it
+	// reports ResourceExists=false and Create makes a duplicate project.
+	e := projectExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/chats/projects/") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.URL.Path == "/api/chats/projects" {
+			_, _ = io.WriteString(w, `{"projects":[{"id":"uuid-1","name":"My Project","status":"active"}]}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	cr := projectCR("My Project")
+	meta.SetExternalName(cr, "my-project") // slug, not a UUID
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceExists {
+		t.Errorf("ResourceExists = false, want true")
+	}
+	if got := meta.GetExternalName(cr); got != "uuid-1" {
+		t.Errorf("external-name = %q, want uuid-1", got)
 	}
 }
 
