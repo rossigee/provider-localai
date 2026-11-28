@@ -147,6 +147,8 @@ github.com/prometheus/procfs v0.23.0 h1:ad+S6FTkzwaMgacKLM5h6bNKExS+DMH0YiUwXItH
 github.com/prometheus/procfs v0.23.0/go.mod h1:3AVXO0FqLafyYFU/V/IQRZlC8Rgqz8Dm/x6pKLK+RIk=
 github.com/rossigee/crossplane-runtime/v2 v2.5.1 h1:SgFnC2+kDB21QwDiKMpi+fnBnn7m286UzBKjXfytzyE=
 github.com/rossigee/crossplane-runtime/v2 v2.5.1/go.mod h1:HydCb6kEfcRF2VtlVdWA8tCNghY7Ug+fVOmoQ+0ryzI=
+github.com/rossigee/localai-client v0.10.1-0.20261127120235-01ba79822f57 h1:vJqBiq1fSRJCkEUeY2NFeShVViDkdb4lUGXnhdkpuww=
+github.com/rossigee/localai-client v0.10.1-0.20261127120235-01ba79822f57/go.mod h1:25DT3j6yJ6gZVyYzE10ZVOF5OpiQrSoTMHPOrJ0l9HM=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/spf13/afero v1.15.0 h1:b/YBCLWAJdFWJTN9cLhiXXcD7mzKn9Dm86dNnfyQw1I=
 github.com/spf13/afero v1.15.0/go.mod h1:NC2ByUVxtQs4b3sIUphxK0NioZnmxgyCrfzeuq8lxMg=

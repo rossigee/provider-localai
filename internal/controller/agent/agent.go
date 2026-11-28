@@ -201,6 +201,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		}
 		meta.SetExternalName(cr, existing.ID)
 		cr.Status.AtProvider.ID = existing.ID
+		cr.Status.AtProvider.Owner = existing.Owner
 		return managed.ExternalCreation{}, nil
 	}
 	meta.SetExternalName(cr, a.ID)

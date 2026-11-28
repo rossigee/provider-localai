@@ -197,3 +197,109 @@ func TestCreateConflictWithoutMatchingAgentFails(t *testing.T) {
 		t.Fatal("Create succeeded although the conflicting agent could not be found")
 	}
 }
+
+const ownedAgentJSON = `{"id":"a1","owner":"tenant-user","name":"reviewer","model":"m1",` +
+	`"instructions":"review things","description":"","mcp_servers":[],"addons":[],` +
+	`"collections":["docs"],"skills":[],"network":"off"}`
+
+func ownedAgentCR() *agentv1beta1.Agent {
+	cr := agentCR("reviewer")
+	cr.Spec.ForProvider.Owner = "tenant-user"
+	return cr
+}
+
+func TestObserveUsesOwnerScope(t *testing.T) {
+	e, _ := agentExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("user_id"); got != "tenant-user" {
+			t.Errorf("user_id = %q, want tenant-user", got)
+		}
+		_, _ = io.WriteString(w, ownedAgentJSON)
+	})
+	cr := ownedAgentCR()
+	meta.SetExternalName(cr, "a1")
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceExists || !obs.ResourceUpToDate {
+		t.Errorf("observation = %+v, want existing and up to date", obs)
+	}
+	if cr.Status.AtProvider.Owner != "tenant-user" {
+		t.Errorf("status owner = %q, want tenant-user", cr.Status.AtProvider.Owner)
+	}
+}
+
+func TestObserveDetectsOwnerDrift(t *testing.T) {
+	e, _ := agentExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"id":"a1","name":"reviewer","model":"m1","instructions":"review things",`+
+			`"description":"","mcp_servers":[],"addons":[],"collections":["docs"],"skills":[],"network":"off"}`)
+	})
+	cr := ownedAgentCR()
+	meta.SetExternalName(cr, "a1")
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceExists || obs.ResourceUpToDate {
+		t.Errorf("observation = %+v, want existing but not up to date", obs)
+	}
+}
+
+func TestAgentLifecycleSendsOwnerScope(t *testing.T) {
+	e, _ := agentExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("user_id"); got != "tenant-user" {
+			t.Errorf("%s %s user_id = %q, want tenant-user", r.Method, r.URL.Path, got)
+		}
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/chats/agents":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"id":"a9","owner":"tenant-user","name":"reviewer"}`)
+		case r.Method == http.MethodPut && r.URL.Path == "/api/chats/agents/a9":
+			_, _ = io.WriteString(w, ownedAgentJSON)
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/chats/agents/a9":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+	cr := ownedAgentCR()
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if got := cr.Status.AtProvider.Owner; got != "tenant-user" {
+		t.Errorf("status owner after create = %q, want tenant-user", got)
+	}
+	if _, err := e.Update(context.Background(), cr); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if _, err := e.Delete(context.Background(), cr); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+}
+
+func TestCreateAdoptsExistingAgentWithOwnerScope(t *testing.T) {
+	e, _ := agentExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("user_id"); got != "tenant-user" {
+			t.Errorf("%s %s user_id = %q, want tenant-user", r.Method, r.URL.Path, got)
+		}
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/chats/agents":
+			w.WriteHeader(http.StatusConflict)
+			_, _ = io.WriteString(w, `{"error":{"code":409,"message":"you already have an agent with this name","type":"conflict"}}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/api/chats/agents":
+			_, _ = io.WriteString(w, `{"agents":[{"id":"legacy1","owner":"tenant-user","name":"reviewer"}]}`)
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+	cr := ownedAgentCR()
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatalf("Create adopting an existing agent returned %v, want nil", err)
+	}
+	if got := meta.GetExternalName(cr); got != "legacy1" {
+		t.Errorf("external name = %q, want the adopted ID legacy1", got)
+	}
+	if got := cr.Status.AtProvider.Owner; got != "tenant-user" {
+		t.Errorf("status owner after adoption = %q, want tenant-user", got)
+	}
+}
