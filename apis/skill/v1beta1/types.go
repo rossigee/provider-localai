@@ -10,10 +10,16 @@ import (
 // identified by its layer and name.
 type SkillParameters struct {
 	// Layer is the skill layer: personal skills belong to the service user,
-	// shared skills are visible to every user.
+	// shared skills are visible to every user, and project skills belong to a
+	// project and are always on for its chats and agents.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=personal;shared
+	// +kubebuilder:validation:Enum=personal;shared;project
 	Layer string `json:"layer"`
+
+	// ProjectID is the LocalAI ID of the project that owns a project-layer
+	// skill. Required when layer is project, ignored otherwise.
+	// +optional
+	ProjectID string `json:"projectId,omitempty"`
 
 	// Name is the skill's name.
 	// +kubebuilder:validation:Required
@@ -35,6 +41,9 @@ type SkillObservation struct {
 
 	// Name is the skill's name as LocalAI reports it.
 	Name string `json:"name,omitempty"`
+
+	// ProjectID is the project that owns a project-layer skill.
+	ProjectID string `json:"projectId,omitempty"`
 }
 
 // SkillSpec is the desired state of a Skill.

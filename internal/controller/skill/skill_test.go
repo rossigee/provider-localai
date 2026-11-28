@@ -11,6 +11,7 @@ import (
 
 	laiclient "github.com/rossigee/localai-client/client"
 	skillv1beta1 "github.com/rossigee/provider-localai/apis/skill/v1beta1"
+	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 func skillCR(name string) *skillv1beta1.Skill {
@@ -28,11 +29,47 @@ func skillExternal(t *testing.T, h http.HandlerFunc) *external {
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	cfg := laiclient.Config{BaseURL: srv.URL, APIKey: "k"}
+	c, err := laiclient.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	return &external{client: c}
+	raw, err := clients.NewRawClient(cfg)
+	if err != nil {
+		t.Fatalf("NewRawClient: %v", err)
+	}
+	return &external{client: c, raw: raw}
+}
+
+func TestSkillPathIncludesProjectForProjectLayer(t *testing.T) {
+	p := skillv1beta1.SkillParameters{Layer: "project", Name: "overview", ProjectID: "abc123"}
+	want := "/api/chats/skills/project/overview?project=abc123"
+	if got := skillPath(p); got != want {
+		t.Fatalf("skillPath = %q, want %q", got, want)
+	}
+}
+
+func TestObserveProjectSkillUsesProjectQuery(t *testing.T) {
+	e := skillExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/chats/skills/project/overview" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("project"); got != "p1" {
+			t.Errorf("project = %q, want p1", got)
+		}
+		_, _ = io.WriteString(w, `{"name":"overview","layer":"project","description":"d","body":"c"}`)
+	})
+	cr := skillCR("overview")
+	cr.Spec.ForProvider.Layer = "project"
+	cr.Spec.ForProvider.ProjectID = "p1"
+	cr.Spec.ForProvider.Description = "d"
+	obs, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	if !obs.ResourceExists || !obs.ResourceUpToDate {
+		t.Fatalf("obs = %+v, want exists and up to date", obs)
+	}
 }
 
 func TestObserveLooksUpByLayerAndName(t *testing.T) {

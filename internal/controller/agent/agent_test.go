@@ -12,6 +12,7 @@ import (
 
 	laiclient "github.com/rossigee/localai-client/client"
 	agentv1beta1 "github.com/rossigee/provider-localai/apis/agent/v1beta1"
+	"github.com/rossigee/provider-localai/internal/clients"
 )
 
 func agentCR(name string) *agentv1beta1.Agent {
@@ -30,11 +31,16 @@ func agentExternal(t *testing.T, h http.HandlerFunc) (*external, *httptest.Serve
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	c, err := laiclient.New(context.Background(), laiclient.Config{BaseURL: srv.URL, APIKey: "k"})
+	cfg := laiclient.Config{BaseURL: srv.URL, APIKey: "k"}
+	c, err := laiclient.New(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	return &external{client: c}, srv
+	raw, err := clients.NewRawClient(cfg)
+	if err != nil {
+		t.Fatalf("NewRawClient: %v", err)
+	}
+	return &external{client: c, raw: raw}, srv
 }
 
 // matchingAgentJSON is what LocalAI reports for agentCR once it has been saved.
@@ -158,6 +164,39 @@ func TestDeleteWithoutExternalNameSendsNothing(t *testing.T) {
 	}
 	if requests != 0 {
 		t.Errorf("Delete sent %d request(s) without an external name, want 0", requests)
+	}
+}
+
+func TestCreateMovesAgentIntoProject(t *testing.T) {
+	var moved bool
+	e, _ := agentExternal(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/chats/agents" {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"id":"a9","name":"reviewer"}`)
+			return
+		}
+		if r.Method == http.MethodPut && r.URL.Path == "/api/chats/agents/a9/project" {
+			moved = true
+			if r.URL.Query().Get("user_id") != "u1" {
+				t.Errorf("user_id = %q, want u1", r.URL.Query().Get("user_id"))
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"ok":true}`)
+			return
+		}
+		t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+	})
+	cr := agentCR("reviewer")
+	cr.Spec.ForProvider.Owner = "u1"
+	cr.Spec.ForProvider.ProjectID = "p1"
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if !moved {
+		t.Error("Create did not call the move endpoint")
+	}
+	if got := cr.Status.AtProvider.ProjectID; got != "p1" {
+		t.Errorf("status project = %q, want p1", got)
 	}
 }
 

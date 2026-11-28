@@ -118,6 +118,12 @@ spec:
                       passes user_id to LocalAI agent endpoints (admin scope). Leave empty to
                       manage agents owned by the API key identity.
                     type: string
+                  projectId:
+                    description: |-
+                      ProjectID is the LocalAI project the agent belongs to. A normal agent
+                      write cannot change a project, so the provider uses the dedicated move
+                      endpoint. Leave empty for a projectless agent.
+                    type: string
                   skills:
                     description: Skills lists the names of the skills the agent may
                       use.
@@ -199,6 +205,9 @@ spec:
                     type: string
                   owner:
                     description: Owner is the LocalAI user id that owns the agent.
+                    type: string
+                  projectId:
+                    description: ProjectID is the project the agent currently belongs to.
                     type: string
                 type: object
               conditions:
